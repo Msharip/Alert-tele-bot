@@ -1,0 +1,176 @@
+const axios = require('axios');
+const cheerio = require('cheerio-without-node-native');
+const TelegramBot = require('node-telegram-bot-api');
+const cron = require('node-cron');
+const express = require('express');
+const path = require('path');
+const mysql = require('mysql2');
+require('dotenv').config();
+const productNames = {
+  'https://www.dzrt.com/ar/icy-rush.html': { ar: 'آيسي رش', en: 'icy-rush' },
+  'https://www.dzrt.com/ar/seaside-frost.html': { ar: 'سي سايد فروست', en: 'seaside-frost' },
+  'https://www.dzrt.com/ar/highland-berries.html': { ar: 'هايلاند بيريز', en: 'highland-berries' },
+  'https://www.dzrt.com/ar/haila.html': { ar: 'هيلة', en: 'haila' },
+  'https://www.dzrt.com/ar/samra.html': { ar: 'سمرة', en: 'samra' },
+};
+
+const urls = [
+  'https://www.dzrt.com/ar/icy-rush.html',
+  'https://www.dzrt.com/ar/seaside-frost.html',
+  'https://www.dzrt.com/ar/highland-berries.html',
+  'https://www.dzrt.com/ar/haila.html',
+  'https://www.dzrt.com/ar/samra.html',
+];
+
+const channels = {
+  'https://www.dzrt.com/ar/icy-rush.html': { ar: 'آيسي رش', en: 'icy-rush', chatId: process.env.CHAT_ID_ICY_RUSH },
+  'https://www.dzrt.com/ar/seaside-frost.html': { ar: 'سي سايد فروست', en: 'seaside-frost', chatId: process.env.CHAT_ID_SEASIDE },
+  'https://www.dzrt.com/ar/haila.html': { ar: 'هيلة', en: 'haila', chatId: process.env.CHAT_ID_HAILA },
+  'https://www.dzrt.com/ar/samra.html': { ar: 'سمرة', en: 'samra', chatId: process.env.CHAT_ID_SAMRA },
+  // أضف المنتجات الأخرى ومعرفات القنوات المقابلة هنا
+};
+
+const mainChannelId = process.env.CHAT_ID_MAIN;
+
+const token = process.env.TOKEN3;
+const bot = new TelegramBot(token, { polling: true });
+
+let productStatus = {};
+
+urls.forEach(url => {
+  productStatus[url] = { isAvailable: false, messageId: null };
+});
+
+async function checkProductAvailability(url) {
+  try {
+    const { data } = await axios.get(url);
+    const $ = cheerio.load(data);
+    const isUnavailable = $('div.stock.unavailable span').length > 0;
+
+    if (productNames[url]) {
+      const productNameAr = productNames[url].ar;
+      const imageUrl = path.join(__dirname, 'images', `${productNames[url].en}.png`);
+
+      if (!isUnavailable && !productStatus[url].isAvailable) {
+        // المنتج متوفر الآن ولم يكن متوفرًا في الفحص السابق
+        const message = `*${productNameAr}* - متوفر الآن 🟢 !`;
+        const productUrl = url;
+        const replyMarkup = {
+          inline_keyboard: [
+            [
+              { text: 'شراء سريع ⚡', url: 'https://www.dzrt.com/ar/onestepcheckout.html' },
+              { text: 'إضافة للسلة 🛒', url: productUrl }
+            ],
+            [
+              { text: 'اعادة الطلب 🔁', url: 'https://www.dzrt.com/ar/sales/order/history/' }
+            ]
+          ]
+        };
+
+        console.log(message);
+        const sentMessageMainChannel = await bot.sendPhoto(mainChannelId, imageUrl, { caption: message, parse_mode: 'Markdown', reply_markup: replyMarkup });
+        const sentMessageProductChannel = await bot.sendPhoto(channels[url].chatId, imageUrl, { caption: message, parse_mode: 'Markdown', reply_markup: replyMarkup });
+        
+        productStatus[url] = {
+          isAvailable: true,
+          mainMessageId: sentMessageMainChannel.message_id, // تخزين معرف الرسالة من القناة الرئيسية
+          productMessageId: sentMessageProductChannel.message_id // تخزين معرف الرسالة من قناة المنتج
+        };
+      }
+    }
+  } catch (error) {
+    console.error(`خطأ في التحقق من توفر المنتج ${url}:`, error);
+  }
+}
+
+async function checkAllUrls() {
+  for (const url of urls) {
+    await checkProductAvailability(url);
+  }
+}
+
+// جدولة الفحص ليعمل كل ثانية
+cron.schedule('* * * * * *', () => {
+  checkAllUrls();
+});
+
+
+
+
+const db = mysql.createConnection({
+  host: process.env.DB_HOST,
+  user: process.env.DB_USER,
+  password: process.env.DB_PASSWORD,
+  database: process.env.DB_DATABASE,
+  port: process.env.DB_PORT
+});
+
+async function checkUserSubscriptions() {
+  const currentDate = new Date().toISOString().split('T')[0];
+  const query = 'SELECT id, expiryDate FROM users WHERE activated = true';
+
+  db.query(query, (err, results) => {
+    if (err) {
+      console.error('Error reading subscriptions from database:', err);
+      return;
+    }
+    results.forEach(async user => {
+      if (new Date(user.expiryDate) < new Date(currentDate)) {
+        try {
+          await bot.unbanChatMember(mainChannelId, user.id);
+          await bot.unbanChatMember(process.env.CHAT_ID_ICY_RUSH, user.id);
+          await bot.unbanChatMember(process.env.CHAT_ID_SEASIDE, user.id);
+          await bot.unbanChatMember(process.env.CHAT_ID_SAMARH, user.id);
+ //         await bot.unbanChatMember(process.env.CHAT_ID_HAILA, user.id);
+          // Add other channel IDs here
+
+          const deleteQuery = 'DELETE FROM users WHERE id = ?';
+          db.query(deleteQuery, [user.id], (deleteErr) => {
+            if (deleteErr) {
+              console.error('Error deleting user from the database:', deleteErr);
+            } else {
+              console.log(`User ${user.id} removed from the database.`);
+            }
+          });
+        } catch (error) {
+          console.error(`Failed to remove user ${user.id} from the channels:`, error);
+        }
+      }
+    });
+  });
+}
+
+
+async function handleJoinRequests(request) {
+  if (request) {
+    const userId = request.user_chat_id;
+    const channelId = request.chat.id; // القناة التي تم إرسال الطلب إليها
+    const query = 'SELECT id FROM users WHERE id = ? AND activated = true';
+
+    db.query(query, [userId], async (err, results) => {
+      if (err) {
+        console.error('Error reading subscriptions from database:', err);
+        return;
+      }
+
+      if (results.length > 0) {
+        try {
+          await bot.approveChatJoinRequest(channelId, userId);
+          console.log(`Successfully approved user ${userId} to join the channel ${channelId}`);
+        } catch (error) {
+        }
+      } else {
+        console.log(`User ${userId} not found in active subscriptions.`);
+      }
+    });
+  }
+}
+
+bot.on('chat_join_request', handleJoinRequests);
+
+// جدولة فحص الاشتراكات ليعمل يوميًا
+cron.schedule('0 0 * * * *', () => {
+  console.log('Running daily subscription check');
+  checkUserSubscriptions();
+});
+

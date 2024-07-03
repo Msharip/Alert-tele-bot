@@ -1,0 +1,346 @@
+const axios = require('axios');
+const cheerio = require('cheerio');
+const TelegramBot = require('node-telegram-bot-api');
+const mysql = require('mysql2/promise'); // استخدام promise لتحسين الأداء
+const express = require('express');
+require('dotenv').config();
+const app = express();
+
+const dbConfig = {
+  host: process.env.DB_HOST,
+  user: process.env.DB_USER,
+  password: process.env.DB_PASSWORD,
+  database: process.env.DB_DATABASE,
+  port: process.env.DB_PORT
+};
+
+const token = process.env.TOKEN4;
+const bot = new TelegramBot(token, { polling: true });
+async function activateUserSubscription(userId, code, duration, callback) {
+  let connection;
+  try {
+    connection = await mysql.createConnection(dbConfig);
+    await connection.beginTransaction(); // بدء المعاملة
+
+    const [existingUsers] = await connection.execute('SELECT * FROM users WHERE id = ?', [userId]);
+    const user = existingUsers.length > 0 ? existingUsers[0] : null;
+
+    if (user) {
+      await extendUserSubscription(connection, userId, code, duration, callback);
+    } else {
+      const startDate = new Date().toISOString().split('T')[0];
+      let expiryDate = new Date();
+      if (duration < 0) {
+        // إذا كانت المدة سلبية، فإن القيمة بالأيام
+        expiryDate.setDate(expiryDate.getDate() - duration);
+      } else {
+        expiryDate.setMonth(expiryDate.getMonth() + duration);
+      }
+
+      const insertQuery = `
+        INSERT INTO users (id, activated, subscriptionType, startDate, expiryDate)
+        VALUES (?, ?, ?, ?, ?)
+      `;
+      await connection.execute(insertQuery, [userId, true, `${Math.abs(duration)} ${duration < 0 ? 'يوم' : 'أشهر'}`, startDate, expiryDate.toISOString().split('T')[0]]);
+      await deleteActivationCode(connection, code);
+      await connection.commit(); // تأكيد المعاملة
+      callback(`تم تفعيل اشتراكك بنجاح لمدة ${Math.abs(duration)} ${duration < 0 ? 'يوم' : 'أشهر'}.`);
+    }
+  } catch (err) {
+    if (connection) await connection.rollback(); // إلغاء المعاملة في حال حدوث خطأ
+    console.error('Error activating subscription:', err);
+    callback('حدث خطأ أثناء تفعيل الاشتراك.');
+  } finally {
+    if (connection) await connection.end();
+  }
+}
+
+
+async function extendUserSubscription(connection, userId, code, duration, callback) {
+  try {
+    const [existingUsers] = await connection.execute('SELECT * FROM users WHERE id = ?', [userId]);
+    const user = existingUsers.length > 0 ? existingUsers[0] : null;
+
+    if (!user) {
+      callback('ليس لديك اشتراك حاليًا.');
+      return;
+    }
+
+    let expiryDate = new Date(user.expiryDate);
+    let totalDuration = '';
+
+    if (user.subscriptionType.includes('يوم')) {
+      // إذا كان الاشتراك الحالي بالأيام وقام بتفعيل اشتراك جديد بالأشهر
+      if (duration > 0) {
+        // الاشتراك الجديد بالأشهر
+        expiryDate = new Date();
+        expiryDate.setMonth(expiryDate.getMonth() + duration);
+        totalDuration = `${duration} أشهر`;
+      } else {
+        // تمديد الاشتراك الحالي بالأيام
+        expiryDate.setDate(expiryDate.getDate() - duration);
+        const totalDays = user.subscriptionType.match(/\d+/) ? parseInt(user.subscriptionType.match(/\d+/)[0]) - duration : Math.abs(duration);
+        totalDuration = `${totalDays} يوم`;
+      }
+    } else {
+      // إذا كان الاشتراك الحالي بالأشهر
+      if (duration < 0) {
+        // تحويل المدة بالأيام إلى أشهر وإضافتها
+        expiryDate.setDate(expiryDate.getDate() - duration);
+        const totalMonths = user.subscriptionType.match(/\d+/) ? parseInt(user.subscriptionType.match(/\d+/)[0]) + Math.floor(duration / 30) : Math.abs(duration);
+        totalDuration = `${totalMonths} أشهر`;
+      } else {
+        // تمديد بالأشهر
+        expiryDate.setMonth(expiryDate.getMonth() + duration);
+        const totalMonths = user.subscriptionType.match(/\d+/) ? parseInt(user.subscriptionType.match(/\d+/)[0]) + duration : duration;
+        totalDuration = `${totalMonths} أشهر`;
+      }
+    }
+
+    const updateQuery = `
+      UPDATE users SET expiryDate = ?, subscriptionType = ? WHERE id = ?
+    `;
+    await connection.execute(updateQuery, [expiryDate.toISOString().split('T')[0], totalDuration, userId]);
+    await deleteActivationCode(connection, code);
+    await connection.commit(); // تأكيد المعاملة
+    callback(`تم تمديد اشتراكك بنجاح لمدة ${Math.abs(duration)} ${duration < 0 ? 'يوم' : 'أشهر'}.\n الآن مجموع الاشتراك هو ${totalDuration}.`);
+  } catch (err) {
+    console.error('Error extending subscription:', err);
+    throw new Error('حدث خطأ أثناء تمديد الاشتراك.');
+  }
+}
+
+
+
+async function deleteActivationCode(connection, code) {
+  const deleteQuery = 'DELETE FROM activationcodes WHERE activation_code = ?';
+  await connection.execute(deleteQuery, [code]);
+}
+
+bot.onText(/\/start/, (msg) => {
+  const chatId = msg.chat.id;
+  const welcomeMessage = `
+⚡ **انضم إلى اسرع بوت تنبيهات DZRT الآن!** ⚡
+
+قروب دزرت فوري العام - لمستخدمين البوت 👇 :
+                https://t.me/+hrIusgChjeMwY2Zk
+
+1 - قم بزيارة متجرنا الآن 
+واختر الاشتراك الذي يناسب احتياجاتك.
+
+2 - أكمل عملية الشراء 
+واحصل على رمز التفعيل الخاص بك.
+
+3- استخدم الرمز لتفعيل الاشتراك 
+واستمتع بتلقي إشعارات فورية.
+
+4- وبامكانك تمديد اشتراك 
+عن طريق ( معرفة الاشتراك )
+
+👇 **انضم الآن وقم بزيارة المتجر والاشتراك!** 👇
+                      dzrt.com
+`;
+
+  const keyboard = {
+    inline_keyboard: [
+      [
+        { text: 'رابط المتجر 🛒', url: 'https://www.dzrt.com/ar/our-products.html' },
+        { text: 'تفعيل الاشتراك 🔑', callback_data: 'activate_subscription_command' }
+      ],
+      [
+        { text: 'الدعم الفني 📞', callback_data: 'support_command' },
+        { text: 'معرفة الاشتراك 📊', callback_data: 'subscription_status_command' }
+      ]
+    ]
+  };
+
+  bot.sendMessage(chatId, welcomeMessage, { parse_mode: 'Markdown', reply_markup: JSON.stringify(keyboard) });
+});
+
+bot.on('callback_query', (query) => {
+  const chatId = query.message.chat.id;
+
+  if (query.data === 'activate_subscription_command') {
+    const activationMessage = `
+قم بإدخال الرمز لتفعيل الاشتراك 🔑
+    `;
+    const keyboard = {
+      inline_keyboard: [
+        [
+          { text: 'رجوع 🔙', callback_data: 'start' }
+        ]
+      ]
+    };
+    bot.editMessageText(activationMessage, {
+      chat_id: chatId,
+      message_id: query.message.message_id,
+      reply_markup: JSON.stringify(keyboard)
+    });
+
+    bot.once('message', async (msg) => {
+      const code = msg.text.trim();
+      const userId = msg.from.id;
+      activateSubscription(userId, code, (response) => {
+        bot.sendMessage(chatId, response);
+        if (response.startsWith('تم تفعيل اشتراكك بنجاح')) {
+          bot.sendMessage(chatId, 'رابط القناة للانضمام: \n\n https://t.me/+3imWhRxXVngxMWE0');
+        }
+      });
+    });
+  } else if (query.data === 'subscription_status_command') {
+    const userId = query.from.id;
+    getSubscriptionStatus(userId, (response) => {
+      const keyboard = {
+        inline_keyboard: [
+          [
+            { text: 'تمديد الاشتراك 🔄', callback_data: 'extend_subscription_command' }
+          ],
+          [
+            { text: 'رجوع 🔙', callback_data: 'start' }
+          ]
+        ]
+      };
+      bot.editMessageText(response, {
+        chat_id: chatId,
+        message_id: query.message.message_id,
+        reply_markup: JSON.stringify(keyboard)
+      });
+    });
+  } else if (query.data === 'extend_subscription_command') {
+    const extendMessage = `
+قم بإدخال الرمز لتمديد الاشتراك 🔄
+    `;
+    const keyboard = {
+      inline_keyboard: [
+        [
+          { text: 'رجوع 🔙', callback_data: 'subscription_status_command' }
+        ]
+      ]
+    };
+    bot.editMessageText(extendMessage, {
+      chat_id: chatId,
+      message_id: query.message.message_id,
+      reply_markup: JSON.stringify(keyboard)
+    });
+
+    bot.once('message', async (msg) => {
+      const code = msg.text.trim();
+      const userId = msg.from.id;
+      activateSubscription(userId, code, (response) => {
+        bot.sendMessage(chatId, response);
+        if (response.startsWith('تم تمديد اشتراكك بنجاح')) {
+          bot.sendMessage(chatId, 'رابط القناة للانضمام: \n \n https://t.me/+3imWhRxXVngxMWE0');
+        }
+      });
+    });
+  } else if (query.data === 'support_command') {
+    const supportMessage = `
+**الدعم الفني:**
+
+رابط قناة التنبيهات للمشتركين المفعلين  :
+https://t.me/+3imWhRxXVngxMWE0
+
+
+للحصول على المساعدة
+يمكنك التواصل معنا عبر الرابط التالي:
+
+[الدعم الفني](https://t.me/MZZ_2)
+    `;
+    const keyboard = {
+      inline_keyboard: [
+        [
+          { text: 'رجوع 🔙', callback_data: 'start' }
+        ]
+      ]
+    };
+    bot.editMessageText(supportMessage, {
+      chat_id: chatId,
+      message_id: query.message.message_id,
+      parse_mode: 'Markdown',
+      reply_markup: JSON.stringify(keyboard)
+    });
+  } else if (query.data === 'start') {
+    const welcomeMessage = `
+⚡ **انضم إلى اسرع بوت تنبيهات DZRT الآن!** ⚡
+
+قروب دزرت فوري العام - لمستخدمين البوت 👇 :
+                https://t.me/+hrIusgChjeMwY2Zk
+
+1️ - قم بزيارة متجرنا الآن 
+واختر الاشتراك الذي يناسب احتياجاتك.
+
+2️ - أكمل عملية الشراء 
+واحصل على رمز التفعيل الخاص بك.
+
+3- استخدم الرمز لتفعيل الاشتراك 
+واستمتع بتلقي إشعارات فورية.
+
+4- وبامكانك تمديد اشتراك 
+عن طريق ( معرفة الاشتراك )
+
+👇 **انضم الآن وقم بزيارة المتجر والاشتراك!** 👇
+                      dzrt.com
+`;
+
+    const keyboard = {
+      inline_keyboard: [
+        [
+          { text: 'رابط المتجر 🛒', url: 'https://www.dzrt.com/ar/our-products.html' },
+          { text: 'تفعيل الاشتراك 🔑', callback_data: 'activate_subscription_command' }
+        ],
+        [
+          { text: 'الدعم الفني 📞', callback_data: 'support_command' },
+          { text: 'معرفة الاشتراك 📊', callback_data: 'subscription_status_command' }
+        ]
+      ]
+    };
+
+    bot.editMessageText(welcomeMessage, {
+      chat_id: chatId,
+      message_id: query.message.message_id,
+      parse_mode: 'Markdown',
+      reply_markup: JSON.stringify(keyboard)
+    });
+  }
+});
+
+async function getSubscriptionStatus(userId, callback) {
+  let connection;
+  try {
+    connection = await mysql.createConnection(dbConfig);
+    const [results] = await connection.execute('SELECT * FROM users WHERE id = ?', [userId]);
+    if (results.length === 0) {
+      callback('ليس لديك اشتراك حاليًا.');
+      return;
+    }
+    const user = results[0];
+    const subscriptionType = user.subscriptionType;
+    const remainingDays = Math.floor((new Date(user.expiryDate) - new Date()) / (1000 * 60 * 60 * 24));
+    callback(`حالة الاشتراك: مفعل\nنوع الاشتراك: ${subscriptionType}\nمدة باقية للاشتراك: ${remainingDays} يومًا`);
+  } catch (err) {
+    console.error('Error getting subscription status:', err);
+    callback('حدث خطأ أثناء التحقق من حالة الاشتراك.');
+  } finally {
+    if (connection) await connection.end();
+  }
+}
+
+async function activateSubscription(userId, code, callback) {
+  let connection;
+  try {
+    connection = await mysql.createConnection(dbConfig);
+    const [results] = await connection.execute('SELECT * FROM activationcodes WHERE activation_code = ?', [code]);
+    if (results.length > 0) {
+      const duration = results[0].duration_in_months;
+      await activateUserSubscription(userId, code, duration, callback);
+    } else {
+      callback('الرمز غير صالح.');
+    }
+  } catch (err) {
+    console.error('Error checking activation codes:', err);
+    callback('حدث خطأ أثناء التحقق من الكود.');
+  } finally {
+    if (connection) await connection.end();
+  }
+}
+
