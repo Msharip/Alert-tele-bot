@@ -83,7 +83,6 @@ async function checkProductAvailability(url) {
         if (!productStatus[url].isAvailable && !productStatus[url].isNotifying) {
           const message = `*${productNameAr}* - متوفر الآن ✅ `;
           console.log(message);
-
           const replyMarkup = {
             inline_keyboard: [
               [
@@ -132,7 +131,6 @@ async function checkProductAvailability(url) {
       }
     }
   } catch (error) {
-    console.error(`Error checking availability for URL ${url}: ${error.message}`);
   }
 }
 
