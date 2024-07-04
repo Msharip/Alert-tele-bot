@@ -1,5 +1,6 @@
 const TelegramBot = require('node-telegram-bot-api');
 const mysql = require('mysql2/promise');
+const cron = require('node-cron');
 require('dotenv').config();
 
 const dbConfig = {
@@ -42,6 +43,9 @@ async function activateUserSubscription(userId, code, duration, callback) {
       await connection.commit();
       callback(`**تم تفعيل اشتراكك بنجاح لمدة ${Math.abs(duration)} ${duration < 0 ? 'يوم' : 'أشهر'}.** 🎉`);
     }
+
+    // تحديث حالة الاشتراك إلى نشط
+    await connection.execute('UPDATE users SET activated = true WHERE id = ?', [userId]);
   } catch (err) {
     if (connection) await connection.rollback();
     console.error('Error activating subscription:', err);
@@ -128,6 +132,9 @@ bot.onText(/\/start/, (msg) => {
   const mainKeyboard = {
     inline_keyboard: [
       [
+        { text: ' تجربة مجانية 🎁', callback_data: 'free_trial_command' },
+      ],
+      [
         { text: 'قنوات التنبيهات 🔔', callback_data: 'notification_channels_command' },
         { text: 'تفعيل الاشتراك 🔑', callback_data: 'activate_subscription_command' }
       ],
@@ -172,6 +179,22 @@ bot.onText(/\/start/, (msg) => {
     ]
   };
 
+  const mainKeyboardWithChannels = {
+    inline_keyboard: [
+      [
+        { text: 'الدعم الفني 📩', url: 'https://t.me/MZZ_2' },
+        { text: 'قنوات التنبيهات 🔔', callback_data: 'notification_channels_command' }
+
+      ],
+      [
+        { text: 'رابط المتجر 🛒', url: 'https://www.dzrt.com/ar/our-products.html' }
+      ],
+         [
+        { text: 'رجوع 🔙', callback_data: 'start' }
+      ]
+    ]
+  };
+
   bot.sendMessage(chatId, welcomeMessage, {
     reply_markup: mainKeyboard,
     parse_mode: 'Markdown'
@@ -185,7 +208,10 @@ bot.onText(/\/start/, (msg) => {
     if (callbackUserId !== userId) return;
 
     const updateMessage = (text, keyboard) => {
-      if (msg.text !== text || JSON.stringify(msg.reply_markup) !== JSON.stringify(keyboard)) {
+      const isContentDifferent = msg.text !== text;
+      const isKeyboardDifferent = JSON.stringify(msg.reply_markup) !== JSON.stringify(keyboard);
+
+      if (isContentDifferent || isKeyboardDifferent) {
         bot.editMessageText(text, {
           chat_id: msg.chat.id,
           message_id: msg.message_id,
@@ -275,6 +301,11 @@ bot.onText(/\/start/, (msg) => {
         ]
       };
       updateMessage(supportMessage, keyboard);
+    } else if (data === 'free_trial_command') {
+      handleFreeTrial(userId, async (response, showChannelsButton) => {
+        const keyboard = showChannelsButton ? mainKeyboardWithChannels : mainKeyboard;
+        updateMessage(response, keyboard);
+      });
     } else if (data === 'start') {
       updateMessage(welcomeMessage, mainKeyboard);
     }
@@ -320,7 +351,7 @@ async function getSubscriptionStatus(userId, callback) {
   try {
     connection = await mysql.createConnection(dbConfig);
     const [results] = await connection.execute('SELECT * FROM users WHERE id = ?', [userId]);
-    if (results.length === 0) {
+    if (results.length === 0 || results[0].activated === 0) {
       callback(' ليس لديك اشتراك حاليًا ⚠️ ');
       return;
     }
@@ -331,26 +362,6 @@ async function getSubscriptionStatus(userId, callback) {
   } catch (err) {
     console.error('Error getting subscription status:', err);
     callback('⚠️ حدث خطأ أثناء التحقق من حالة الاشتراك.');
-  } finally {
-    if (connection) await connection.end();
-  }
-}
-
-async function getSubscriptionStatusText(userId) {
-  let connection;
-  try {
-    connection = await mysql.createConnection(dbConfig);
-    const [results] = await connection.execute('SELECT * FROM users WHERE id = ?', [userId]);
-    if (results.length === 0) {
-      return ' ليس لديك اشتراك حاليًا ⚠️';
-    }
-    const user = results[0];
-    const subscriptionType = user.subscriptionType;
-    const remainingDays = Math.floor((new Date(user.expiryDate) - new Date()) / (1000 * 60 * 60 * 24));
-    return `📊 **حالة الاشتراك:**\n\n🔹 **نوع الاشتراك:** ${subscriptionType}\n🔹 **مدة باقية للاشتراك:** ${remainingDays} يومًا`;
-  } catch (err) {
-    console.error('Error getting subscription status:', err);
-    return '⚠️ حدث خطأ أثناء التحقق من حالة الاشتراك.';
   } finally {
     if (connection) await connection.end();
   }
@@ -374,3 +385,72 @@ async function activateSubscription(userId, code, callback) {
     if (connection) await connection.end();
   }
 }
+
+async function handleFreeTrial(userId, callback) {
+  let connection;
+  try {
+    connection = await mysql.createConnection(dbConfig);
+    const [results] = await connection.execute('SELECT trial_used, activated FROM users WHERE id = ?', [userId]);
+
+    if (results.length > 0) {
+      const user = results[0];
+      const [trialCountResult] = await connection.execute('SELECT count FROM trial_usage WHERE id = 1');
+      const trialCount = trialCountResult[0].count;
+
+      if (user.trial_used) {
+        callback('لقد استخدمت التجربة المجانية مسبقًا ⚠️. بامكانك الاشتراك من هنا: [رابط المتجر]( https://www.dzrt.com/ar/our-products.html )', false);
+      } else if (user.activated) {
+        callback('لديك اشتراك نشط حاليًا ⚠️.', false);
+      } else if (trialCount >= 20) {
+        callback('لقد تم استخدام جميع الاشتراكات التجريبية المجانية لهذا اليوم ⚠️.', false);
+      } else {
+        await activateFreeTrial(userId, connection);
+        await connection.execute('UPDATE trial_usage SET count = count + 1 WHERE id = 1');
+        callback('تم تفعيل الاشتراك التجريبي المجاني ليوم واحد بنجاح 🎉 \n\n  قم بالضغط على قنوات التنبيهات وانضم الى ماترغب به' , true);
+      }
+    } else {
+      const [trialCountResult] = await connection.execute('SELECT count FROM trial_usage WHERE id = 1');
+      const trialCount = trialCountResult[0].count;
+
+      if (trialCount >= 20) {
+        callback('لقد تم استخدام جميع الاشتراكات التجريبية المجانية لهذا اليوم ⚠️.\n\n يوميا الساعه 12 ظهرا سيتم اعادة تعيين التجربة الى اول 20 شخص ', false);
+      } else {
+        await activateFreeTrial(userId, connection);
+        await connection.execute('UPDATE trial_usage SET count = count + 1 WHERE id = 1');
+        callback('تم تفعيل الاشتراك التجريبي المجاني ليوم واحد بنجاح 🎉 \n\n قم بالضغط على قنوات التنبيهات وانضم الى ماترغب به', true);
+      }
+    }
+  } catch (err) {
+    console.error('Error handling free trial:', err);
+    callback('⚠️ حدث خطأ أثناء تفعيل الاشتراك التجريبي.', false);
+  } finally {
+    if (connection) await connection.end();
+  }
+}
+
+async function activateFreeTrial(userId, connection) {
+  const startDate = new Date().toISOString().split('T')[0];
+  let expiryDate = new Date();
+  expiryDate.setDate(expiryDate.getDate() + 1);
+
+  const insertOrUpdateQuery = `
+    INSERT INTO users (id, activated, subscriptionType, startDate, expiryDate, trial_used)
+    VALUES (?, ?, ?, ?, ?, ?)
+    ON DUPLICATE KEY UPDATE activated = VALUES(activated), subscriptionType = VALUES(subscriptionType), startDate = VALUES(startDate), expiryDate = VALUES(expiryDate), trial_used = VALUES(trial_used)
+  `;
+  await connection.execute(insertOrUpdateQuery, [userId, true, '1 يوم', startDate, expiryDate.toISOString().split('T')[0], true]);
+}
+
+// جدولة إعادة تعيين العداد عند منتصف الليل
+cron.schedule('0 12 * * *', async () => {
+  let connection;
+  try {
+    connection = await mysql.createConnection(dbConfig);
+    await connection.execute('UPDATE trial_usage SET count = 0 WHERE id = 1');
+    console.log('تم إعادة تعيين العداد اليومي للاشتراكات التجريبية المجانية.');
+  } catch (err) {
+    console.error('Error resetting trial count:', err);
+  } finally {
+    if (connection) await connection.end();
+  }
+});
