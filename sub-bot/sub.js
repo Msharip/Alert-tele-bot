@@ -12,6 +12,7 @@ const dbConfig = {
 
 const token = process.env.TOKEN4;
 const bot = new TelegramBot(token, { polling: true });
+
 async function activateUserSubscription(userId, code, duration, callback) {
   let connection;
   try {
@@ -94,7 +95,7 @@ async function extendUserSubscription(connection, userId, code, duration, callba
     callback(`**تم تمديد اشتراكك بنجاح لمدة ${Math.abs(duration)} ${duration < 0 ? 'يوم' : 'أشهر'}.**\n\n الآن مجموع الاشتراك هو ${totalDuration} 🎉`);
   } catch (err) {
     console.error('Error extending subscription:', err);
-    throw new Error('⚠️ حدث خطأ أثناء تمديد الاشتراك.');
+    callback('⚠️ حدث خطأ أثناء تمديد الاشتراك.');
   }
 }
 
@@ -103,8 +104,11 @@ async function deleteActivationCode(connection, code) {
   await connection.execute(deleteQuery, [code]);
 }
 
+const activeUsers = {};
+
 bot.onText(/\/start/, (msg) => {
   const chatId = msg.chat.id;
+  const userId = msg.from.id;
   const welcomeMessage = `
 ⚡ **انضم إلى البوت الأسرع والأكثر تقدمًا** ⚡
 
@@ -157,8 +161,7 @@ bot.onText(/\/start/, (msg) => {
       ],
       [
         { text: 'بيربل ميست 🌺', url: 'https://t.me/+b529gE_uouxiOThk' },
-        { text:  'ايدجي منت ☘ ', url: 'https://t.me/+P34lacNg8gZiOTlk' }
-
+        { text: 'ايدجي منت ☘ ', url: 'https://t.me/+P34lacNg8gZiOTlk' }
       ],
       [
         { text: 'جميع المنتجات 🛒', url: 'https://t.me/+3imWhRxXVngxMWE0' }
@@ -177,14 +180,40 @@ bot.onText(/\/start/, (msg) => {
   bot.on('callback_query', (callbackQuery) => {
     const msg = callbackQuery.message;
     const data = callbackQuery.data;
+    const callbackUserId = callbackQuery.from.id;
+
+    if (callbackUserId !== userId) return;
+
+    const updateMessage = (text, keyboard) => {
+      if (msg.text !== text || JSON.stringify(msg.reply_markup) !== JSON.stringify(keyboard)) {
+        bot.editMessageText(text, {
+          chat_id: msg.chat.id,
+          message_id: msg.message_id,
+          reply_markup: keyboard,
+          parse_mode: 'Markdown'
+        }).catch(error => {
+          console.error(error);
+        });
+      }
+    };
 
     if (data === 'notification_channels_command') {
-      bot.editMessageText(welcomeMessage, {
-        chat_id: msg.chat.id,
-        message_id: msg.message_id,
-        reply_markup: notificationChannelsKeyboard,
-        parse_mode: 'Markdown'
-      });
+      const notificationChannelsText =  `
+      ⚡ **انضم إلى البوت الأسرع والأكثر تقدمًا** ⚡
+      
+      قروب دزرت فوري العام 👇🏻:
+      [قروب دزرت فوري](https://t.me/+hrIusgChjeMwY2Zk)
+      
+      - قم بزيارة متجرنا الآن
+      - أكمل عملية الشراء
+      - استخدم الرمز لتفعيل الاشتراك
+      - وبإمكانك تمديد اشتراكك
+      عن طريق زر *معرفة الاشتراك*
+      
+      👇🏻 **انضم الآن وقم بزيارة المتجر والاشتراك!** 👇🏻
+      [رابط متجر دزرت فوري](https://dzrt.com)
+      `;
+      updateMessage(notificationChannelsText, notificationChannelsKeyboard);
     } else if (data === 'activate_subscription_command') {
       const activationMessage = `
 **قم بإدخال الرمز لتفعيل الاشتراك 🔑:**
@@ -196,31 +225,11 @@ bot.onText(/\/start/, (msg) => {
           ]
         ]
       };
-      bot.editMessageText(activationMessage, {
-        chat_id: msg.chat.id,
-        message_id: msg.message_id,
-        reply_markup: keyboard,
-        parse_mode: 'Markdown'
-      });
+      updateMessage(activationMessage, keyboard);
 
-      bot.once('message', async (msg) => {
-        const code = msg.text.trim();
-        const userId = msg.from.id;
-        activateSubscription(userId, code, async (response) => {
-          if (response.includes('⚠️')) {
-            await bot.sendMessage(chatId, response, { parse_mode: 'Markdown' });
-          } else {
-            const fullResponse = `${response}\n\n ** قنــوات التنبيــهات :
-اختر قناة المنتجات التي ترغب بها :**`;
-            await bot.sendMessage(chatId, fullResponse, {
-              reply_markup: notificationChannelsKeyboard,
-              parse_mode: 'Markdown'
-            });
-          }
-        });
-      });
+      activeUsers[userId] = 'activating';
+
     } else if (data === 'subscription_status_command') {
-      const userId = callbackQuery.from.id;
       getSubscriptionStatus(userId, (response) => {
         const keyboard = {
           inline_keyboard: [
@@ -232,12 +241,7 @@ bot.onText(/\/start/, (msg) => {
             ]
           ]
         };
-        bot.editMessageText(response, {
-          chat_id: msg.chat.id,
-          message_id: msg.message_id,
-          reply_markup: keyboard,
-          parse_mode: 'Markdown'
-        });
+        updateMessage(response, keyboard);
       });
     } else if (data === 'extend_subscription_command') {
       const extendMessage = `
@@ -250,30 +254,10 @@ bot.onText(/\/start/, (msg) => {
           ]
         ]
       };
-      bot.editMessageText(extendMessage, {
-        chat_id: msg.chat.id,
-        message_id: msg.message_id,
-        reply_markup: keyboard,
-        parse_mode: 'Markdown'
-      });
+      updateMessage(extendMessage, keyboard);
 
-      bot.once('message', async (msg) => {
-        const code = msg.text.trim();
-        const userId = msg.from.id;
-        activateSubscription(userId, code, async (response) => {
-          if (response.includes('⚠️')) {
-            await bot.sendMessage(chatId, response, { parse_mode: 'Markdown' });
-          } else {
-            const subscriptionStatus = await getSubscriptionStatusText(userId);
-            const fullResponse = `${response}\n\n${subscriptionStatus}\n\n ** قنــوات التنبيــهات :
-اختر قناة المنتجات التي ترغب بها :**`;
-            await bot.sendMessage(chatId, fullResponse, {
-              reply_markup: notificationChannelsKeyboard,
-              parse_mode: 'Markdown'
-            });
-          }
-        });
-      });
+      activeUsers[userId] = 'extending';
+
     } else if (data === 'support_command') {
       const supportMessage = `
 **الدعم الفني:**
@@ -290,19 +274,43 @@ bot.onText(/\/start/, (msg) => {
           ]
         ]
       };
-      bot.editMessageText(supportMessage, {
-        chat_id: msg.chat.id,
-        message_id: msg.message_id,
-        parse_mode: 'Markdown',
-        reply_markup: keyboard
-      });
+      updateMessage(supportMessage, keyboard);
     } else if (data === 'start') {
-      bot.editMessageText(welcomeMessage, {
-        chat_id: msg.chat.id,
-        message_id: msg.message_id,
-        reply_markup: mainKeyboard,
-        parse_mode: 'Markdown'
-      });
+      updateMessage(welcomeMessage, mainKeyboard);
+    }
+  });
+
+  bot.on('message', async (msg) => {
+    const userId = msg.from.id;
+    const chatId = msg.chat.id;
+
+    if (activeUsers[userId] === 'activating' || activeUsers[userId] === 'extending') {
+      const code = msg.text.trim();
+      const action = activeUsers[userId];
+      delete activeUsers[userId];
+
+      const callback = async (res) => {
+        await bot.sendMessage(chatId, res, { parse_mode: 'Markdown' });
+
+        if (!res.includes('⚠️')) {
+          const fullResponse = `
+          **  قنوات  التنبيهات 🔔 :  
+اختر قناة المنتجات التي ترغب بها
+
+
+واستمتع باسرع اشعارات لمنتجاتك المخصصة:**`;
+          await bot.sendMessage(chatId, fullResponse, {
+            reply_markup: notificationChannelsKeyboard,
+            parse_mode: 'Markdown'
+          });
+        }
+      };
+
+      if (action === 'activating') {
+        await activateSubscription(userId, code, callback);
+      } else if (action === 'extending') {
+        await activateSubscription(userId, code, callback);
+      }
     }
   });
 });
