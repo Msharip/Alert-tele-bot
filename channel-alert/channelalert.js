@@ -2,7 +2,6 @@ const axios = require('axios');
 const cheerio = require('cheerio-without-node-native');
 const TelegramBot = require('node-telegram-bot-api');
 const cron = require('node-cron');
-const express = require('express');
 const path = require('path');
 const mysql = require('mysql2');
 require('dotenv').config();
