@@ -26,12 +26,12 @@ const urls = [
   'https://www.dzrt.com/ar/haila.html',
   'https://www.dzrt.com/ar/samra.html'
 ];
-
 const token = '6749756089:AAFMCjy0-85EkyQIrzC4tJU5jIyFJvpnLEI';
 const chatId = '-1002122565496';
 const bot = new TelegramBot(token, { polling: true });
-const productCooldown = 30 * 60 * 1000; // فترة التهدئة لكل منتج على حدة: 25 دقيقة بالمللي ثانية
+const productCooldown = 20 * 60 * 1000; // فترة التهدئة لكل منتج على حدة: 25 دقيقة بالمللي ثانية
 let productStatus = {};
+let lastAllUnavailableTime = 0;
 
 urls.forEach(url => {
   productStatus[url] = { isAvailable: false, lastNotificationTime: 0, messageId: null, individualCooldownTime: 0 };
@@ -79,6 +79,26 @@ async function checkProductAvailability(url) {
       }
     }
   } catch (error) {
+    console.error(`Error checking product availability for ${url}:`, error);
+  }
+}
+
+function resetCooldownsIfAllUnavailable() {
+  const currentTime = Date.now();
+  const allUnavailable = Object.values(productStatus).every(status => !status.isAvailable);
+
+  if (allUnavailable) {
+    if (lastAllUnavailableTime === 0) {
+      lastAllUnavailableTime = currentTime;
+    } else if (currentTime - lastAllUnavailableTime >= 3 * 60 * 1000) {
+      // إذا كانت جميع المنتجات غير متوفرة لمدة 5 دقائق، قم بإعادة تعيين فترة التهدئة
+      for (const url in productStatus) {
+        productStatus[url].individualCooldownTime = 0;
+      }
+      lastAllUnavailableTime = 0; // إعادة تعيين المؤقت
+    }
+  } else {
+    lastAllUnavailableTime = 0; // إعادة تعيين المؤقت إذا أصبح أي منتج متوفرًا
   }
 }
 
@@ -90,10 +110,12 @@ async function checkAllUrls() {
       await checkProductAvailability(url);
     }
   }
+  resetCooldownsIfAllUnavailable();
 }
 
 // جدولة الفحص ليعمل كل ثانية
 cron.schedule('* * * * * *', () => {
   checkAllUrls();
 });
+
 
