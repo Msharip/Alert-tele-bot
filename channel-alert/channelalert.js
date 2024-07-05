@@ -136,16 +136,11 @@ async function checkProductAvailability(url) {
 }
 
 async function checkAllUrls() {
-  const currentTime = new Date();
-  const currentHour = currentTime.getHours();
-  const currentMinute = currentTime.getMinutes();
-
   for (const url of urls) {
-    // التحقق من أن الوقت الحالي ليس بين الساعة 11:56 و 11:58 للمنتج المحدد
-    if (url === 'https://www.dzrt.com/ar/edgy-mint.html' && currentHour === 11 && currentMinute >= 56 && currentMinute <= 59) {
+    // تحقق من الوقت لتحديد ما إذا كان ينبغي تخطي الفحص لهذا المنتج
+    if (url === 'https://www.dzrt.com/ar/edgy-mint.html' && isWithinTimeRange(11, 50, 12, 0)) {
       continue;
     }
-
     if (!productStatus[url].isNotifying) { // التحقق من أن المنتج ليس قيد الإشعار
       await checkProductAvailability(url);
     }
@@ -160,7 +155,18 @@ function resetCooldownsIfAllUnavailable() {
     }
   }
 }
-
+async function checkAllUrls() {
+  for (const url of urls) {
+    // تحقق من الوقت لتحديد ما إذا كان ينبغي تخطي الفحص لهذا المنتج
+    if (url === 'https://www.dzrt.com/ar/edgy-mint.html' && isWithinTimeRange(11, 50, 12, 0)) {
+      console.log('Skipping check for Edgy Mint during the specified time range.');
+      continue;
+    }
+    if (!productStatus[url].isNotifying) { // التحقق من أن المنتج ليس قيد الإشعار
+      await checkProductAvailability(url);
+    }
+  }
+}
 // جدولة الفحص ليعمل كل ثانية
 cron.schedule('* * * * * *', () => {
   checkAllUrls();
@@ -307,7 +313,7 @@ bot.on('chat_join_request', (request) => {
 });
 
 // جدولة إعادة التحقق من الاشتراكات يوميًا عند منتصف الليل
-cron.schedule('21 7 * * *', () => {
+cron.schedule('10 12 * * *', () => {
   console.log('Running daily subscription check');
   checkUserSubscriptions();
 });
