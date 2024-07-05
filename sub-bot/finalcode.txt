@@ -112,12 +112,10 @@ async function deleteActivationCode(connection, code) {
 }
 
 const activeUsers = new Map();
-const userClicks = new Map();
 
 bot.onText(/\/start/, (msg) => {
   const chatId = msg.chat.id;
   const userId = msg.from.id;
-  userClicks.set(userId, 0);
   const welcomeMessage = `
 ⚡ **انضم إلى البوت الأسرع والأكثر تقدمًا** ⚡
 
@@ -137,15 +135,16 @@ bot.onText(/\/start/, (msg) => {
   const mainKeyboard = {
     inline_keyboard: [
       [
-        { text: 'تجربة مجانية 🎁', callback_data: 'free_trial_command' },
+        { text: ' تجربة مجانية 🎁', callback_data: 'free_trial_command' },
       ],
       [
         { text: 'قنوات التنبيهات 🔔', callback_data: 'notification_channels_command' },
         { text: 'تفعيل الاشتراك 🔑', callback_data: 'activate_subscription_command' }
+        
       ],
       [
         { text: 'الدعم الفني 📩', url: 'https://t.me/MZZ_2' },
-        { text: 'حالة الاشتراك 📊', callback_data: 'subscription_status_command' }
+        { text: ' حالة الاشتراك 📊', callback_data: 'subscription_status_command' }
       ],
       [
         { text: 'رابط المتجر 🛒', url: 'https://www.dzrt.com/ar/our-products.html' }
@@ -164,7 +163,7 @@ bot.onText(/\/start/, (msg) => {
         { text: 'هيلاند بيريز 🍇', url: 'https://t.me/+-l3iURW1JJQ2MDBk' }
       ],
       [
-        { text: 'تمرة 🌴', url: 'https://t.me/+T62d0ZHKjfY2NTlk' },
+        { text: 'تمرة  🌴', url: 'https://t.me/+T62d0ZHKjfY2NTlk' },
         { text: 'سمرة 🌟', url: 'https://t.me/+MSFh3FWe_vs5MjY0' }
       ],
       [
@@ -189,11 +188,12 @@ bot.onText(/\/start/, (msg) => {
       [
         { text: 'الدعم الفني 📩', url: 'https://t.me/MZZ_2' },
         { text: 'قنوات التنبيهات 🔔', callback_data: 'notification_channels_command' }
+
       ],
       [
         { text: 'رابط المتجر 🛒', url: 'https://www.dzrt.com/ar/our-products.html' }
       ],
-      [
+         [
         { text: 'رجوع 🔙', callback_data: 'start' }
       ]
     ]
@@ -211,27 +211,6 @@ bot.onText(/\/start/, (msg) => {
 
     if (callbackUserId !== userId) return;
 
-    // تحديث عدد النقرات للمستخدم
-    if (data !== 'start') {
-      if (!userClicks.has(callbackUserId)) {
-        userClicks.set(callbackUserId, 0);
-      }
-      userClicks.set(callbackUserId, userClicks.get(callbackUserId) + 1);
-
-      if (userClicks.get(callbackUserId) > 8 ) {
-        bot.answerCallbackQuery(callbackQuery.id, {
-          text: '  ⚠️\n لاتقم بالضغط على الازرار بسرعه كبيره \n سيتم ايقاف البوت لمده 10 ثواني',
-          show_alert: true
-        });
-        // إيقاف استجابة البوت لمدة 10 ثوانٍ
-        setTimeout(() => {
-          userClicks.set(callbackUserId, 0); // إعادة تعيين عداد النقرات بعد انتهاء المهلة
-        }, 10000); // 10000 ميلي ثانية = 10 ثوانٍ
-
-        return;
-      }
-    }
-
     const updateMessage = (text, keyboard, msg) => {
       const isContentDifferent = msg.text !== text;
       const isKeyboardDifferent = JSON.stringify(msg.reply_markup) !== JSON.stringify(keyboard);
@@ -244,7 +223,9 @@ bot.onText(/\/start/, (msg) => {
           parse_mode: 'Markdown'
         }).catch((error) => {
           if (error.response.body.error_code === 400 && error.response.body.description.includes("message is not modified")) {
+            console.log("Message content and keyboard are identical. No need to edit.");
           } else {
+            console.error("Error editing message:", error);
           }
         });
       }
@@ -252,7 +233,7 @@ bot.onText(/\/start/, (msg) => {
 
     if (data === 'notification_channels_command') {
       const notificationChannelsText = `
-⚡ **انضم إلى البوت الأسرع والأكثر تقدمًا** ⚡ 
+⚡ **انضم إلى البوت الأسرع والأكثر تقدمًا** ⚡
       
 قروب دزرت فوري العام 👇🏻:
 [قروب دزرت فوري](https://t.me/+hrIusgChjeMwY2Zk)
@@ -372,7 +353,7 @@ async function getSubscriptionStatus(userId, callback) {
     connection = await pool.getConnection();
     const [results] = await connection.execute('SELECT * FROM users WHERE id = ?', [userId]);
     if (results.length === 0 || results[0].activated === 0) {
-      callback('ليس لديك اشتراك حاليًا ⚠️ ');
+      callback(' ليس لديك اشتراك حاليًا ⚠️ ');
       return;
     }
     const user = results[0];
@@ -436,7 +417,7 @@ async function handleFreeTrial(userId, callback) {
         callback('لقد تم استخدام جميع الاشتراكات التجريبية المجانية لهذا اليوم ⚠️.\n\n يوميا الساعه 12 ظهرا سيتم اعادة تعيين التجربة الى اول 20 شخص', false);
       } else {
         await activateFreeTrial(userId, connection);
-        await connection.execute('UPDATE trial_usage SET count = 0 WHERE id = 1');
+        await connection.execute('UPDATE trial_usage SET count = count + 1 WHERE id = 1');
         callback('تم تفعيل الاشتراك التجريبي المجاني ليوم واحد بنجاح 🎉 \n\n قم بالضغط على قنوات التنبيهات وانضم الى ماترغب به', true);
       }
     }

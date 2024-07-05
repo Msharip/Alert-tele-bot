@@ -3,7 +3,7 @@ const cheerio = require('cheerio-without-node-native');
 const TelegramBot = require('node-telegram-bot-api');
 const cron = require('node-cron');
 const path = require('path');
-const mysql = require('mysql2');
+const mysql = require('mysql2/promise');
 require('dotenv').config();
 
 const productNames = {
@@ -56,6 +56,7 @@ const channels = {
 const mainChannelId = process.env.CHAT_ID_MAIN;
 const token = process.env.TOKEN3;
 const bot = new TelegramBot(token, { polling: true });
+
 
 
 const productCooldown = 10 * 60 * 1000; // فترة التهدئة لكل منتج على حدة: 10 دقائق بالمللي ثانية
@@ -135,7 +136,16 @@ async function checkProductAvailability(url) {
 }
 
 async function checkAllUrls() {
+  const currentTime = new Date();
+  const currentHour = currentTime.getHours();
+  const currentMinute = currentTime.getMinutes();
+
   for (const url of urls) {
+    // التحقق من أن الوقت الحالي ليس بين الساعة 11:56 و 11:58 للمنتج المحدد
+    if (url === 'https://www.dzrt.com/ar/edgy-mint.html' && currentHour === 11 && currentMinute >= 56 && currentMinute <= 59) {
+      continue;
+    }
+
     if (!productStatus[url].isNotifying) { // التحقق من أن المنتج ليس قيد الإشعار
       await checkProductAvailability(url);
     }
@@ -148,7 +158,6 @@ function resetCooldownsIfAllUnavailable() {
     for (const url in productStatus) {
       productStatus[url].individualCooldownTime = 0; // إعادة تعيين وقت التهدئة الفردية
     }
-    console.log("تمت إعادة تعيين فترة التهدئة لجميع المنتجات.");
   }
 }
 
@@ -164,18 +173,13 @@ setInterval(() => {
 
 
 
-
-
-
-
-
-const db = mysql.createConnection({
+const dbConfig = {
   host: process.env.DB_HOST,
   user: process.env.DB_USER,
   password: process.env.DB_PASSWORD,
   database: process.env.DB_DATABASE,
   port: process.env.DB_PORT
-});
+};
 
 // دالة تأخير باستخدام Promise
 function delay(ms) {
@@ -185,18 +189,16 @@ function delay(ms) {
 async function checkUserSubscriptions() {
   const currentDate = new Date().toISOString().split('T')[0];
   const query = 'SELECT id, expiryDate FROM users WHERE activated = true';
+  let connection;
 
-  db.query(query, async (err, results) => {
-    if (err) {
-      console.error('Error reading subscriptions from database:', err);
-      return;
-    }
-
+  try {
+    connection = await mysql.createConnection(dbConfig);
+    const [results] = await connection.query(query);
     const usersToUnban = results.filter(user => new Date(user.expiryDate) < new Date(currentDate));
 
     for (const user of usersToUnban) {
       const channelIds = [
-        mainChannelId,
+        process.env.MAIN_CHANNEL_ID,
         process.env.CHAT_ID_ICY_RUSH,
         process.env.CHAT_ID_SEASIDE,
         process.env.CHAT_ID_SAMRA,
@@ -215,17 +217,19 @@ async function checkUserSubscriptions() {
         // الانتظار لمدة 10 ثواني
         await delay(10000);
 
-        const deactivateQuery = 'UPDATE users SET activated = false WHERE id = ?';
-        db.query(deactivateQuery, [user.id], (deactivateErr) => {
-          if (deactivateErr) {
-            console.error('Error deactivating user in the database:', deactivateErr);
-          }
-        });
+        const deactivateQuery = 'UPDATE users SET activated = 0 WHERE id = ?';
+        await connection.query(deactivateQuery, [user.id]);
       } catch (error) {
         console.error(`Failed to remove user ${user.id} from all channels:`, error);
       }
     }
-  });
+  } catch (err) {
+    console.error('Error reading subscriptions from database:', err);
+  } finally {
+    if (connection) {
+      await connection.end();
+    }
+  }
 }
 
 async function unbanUserFromAllChannels(userId, channelIds) {
@@ -245,21 +249,26 @@ async function handleJoinRequests(request) {
     const userId = request.user_chat_id;
     const channelId = request.chat.id;
     const query = 'SELECT id FROM users WHERE id = ? AND activated = true';
+    let connection;
 
-    db.query(query, [userId], async (err, results) => {
-      if (err) {
-        console.error('Error reading subscriptions from database:', err);
-        return;
-      }
+    try {
+      connection = await mysql.createConnection(dbConfig);
+      const [results] = await connection.query(query, [userId]);
 
       if (results.length > 0) {
         try {
           await approveJoinRequestWithDelay(channelId, userId);
         } catch (error) {
+          console.error(`Failed to approve join request for user ${userId} in channel ${channelId}:`, error);
         }
-      } else {
       }
-    });
+    } catch (err) {
+      console.error('Error reading subscriptions from database:', err);
+    } finally {
+      if (connection) {
+        await connection.end();
+      }
+    }
   }
 }
 
@@ -272,7 +281,7 @@ async function approveJoinRequestWithDelay(channelId, userId) {
       } catch (error) {
         reject(error);
       }
-    }, 3000); // Adding a delay of 3 seconds
+    }, 5000); // Adding a delay of 5 seconds
   });
 }
 
@@ -280,32 +289,8 @@ bot.on('chat_join_request', (request) => {
   handleJoinRequests(request);
 });
 
-cron.schedule('0 0 * * *', () => {
+cron.schedule('31 2 * * *', () => {
   console.log('Running daily subscription check');
   checkUserSubscriptions();
 });
-
-
-
-/* وظيفة لإضافة رموز التفعيل
-async function addActivationCodes() {
-  const activationCodes = [];
-  for (let i = 1; i <= 20; i++) {
-    activationCodes.push([`${i}`, -1]);
-  }
-
-  const insertQuery = 'INSERT INTO activationcodes (activation_code, duration_in_months) VALUES ?';
-
-  db.query(insertQuery, [activationCodes], (error, results) => {
-    if (error) {
-      return console.error('Error inserting activation codes:', error);
-    }
-    console.log('Activation codes inserted:', results.affectedRows);
-  });
-}
-
-// استدعاء وظيفة إضافة رموز التفعيل
-addActivationCodes();
-*/
-
 

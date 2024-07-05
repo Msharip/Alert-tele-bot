@@ -59,6 +59,8 @@ const bot = new TelegramBot(token, { polling: true });
 
 
 const productCooldown = 10 * 60 * 1000; // فترة التهدئة لكل منتج على حدة: 10 دقائق بالمللي ثانية
+const resetCooldownInterval = 5 * 60 * 1000; // فترة التحقق إذا ظلت جميع المنتجات غير متوفرة: 5 دقائق بالمللي ثانية
+
 let productStatus = {};
 
 urls.forEach(url => {
@@ -81,7 +83,6 @@ async function checkProductAvailability(url) {
         if (!productStatus[url].isAvailable && !productStatus[url].isNotifying) {
           const message = `*${productNameAr}* - متوفر الآن ✅ `;
           console.log(message);
-
           const replyMarkup = {
             inline_keyboard: [
               [
@@ -140,10 +141,26 @@ async function checkAllUrls() {
     }
   }
 }
+
+function resetCooldownsIfAllUnavailable() {
+  const allUnavailable = Object.values(productStatus).every(status => !status.isAvailable);
+  if (allUnavailable) {
+    for (const url in productStatus) {
+      productStatus[url].individualCooldownTime = 0; // إعادة تعيين وقت التهدئة الفردية
+    }
+  }
+}
+
 // جدولة الفحص ليعمل كل ثانية
 cron.schedule('* * * * * *', () => {
   checkAllUrls();
 });
+
+// جدولة التحقق من حالة جميع المنتجات كل 5 دقائق
+setInterval(() => {
+  resetCooldownsIfAllUnavailable();
+}, resetCooldownInterval);
+
 
 
 
