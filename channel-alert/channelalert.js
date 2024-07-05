@@ -316,8 +316,8 @@ bot.on('chat_join_request', (request) => {
   handleJoinRequests(request);
 });
 
-// جدولة إعادة التحقق من الاشتراكات يوميًا عند الساعة 12:29 صباحًا
-cron.schedule('49 0 * * *', () => {
+// جدولة إعادة التحقق من الاشتراكات يوميًا عند الساعة 12:00 بعد منتصف الليل
+cron.schedule('0 0 * * *', () => {
   console.log('Running daily subscription check');
   checkUserSubscriptions();
 });
