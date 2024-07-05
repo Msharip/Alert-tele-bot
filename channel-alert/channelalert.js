@@ -225,12 +225,7 @@ async function checkUserSubscriptions() {
       ];
 
       try {
-        // إزالة المستخدم من جميع القنوات تدريجيًا
         await unbanUserFromAllChannels(user.id, channelIds);
-
-        console.log(`User ${user.id} has been removed from all channels, including the main channel ${mainChannelId}.`);
-
-        // تحديث حالة الاشتراك في قاعدة البيانات
         await deactivateUserSubscription(user.id);
 
         console.log(`User ${user.id} subscription has been deactivated.`);
@@ -251,11 +246,9 @@ async function unbanUserFromAllChannels(userId, channelIds) {
   for (const channelId of channelIds) {
     if (channelId) {
       try {
-        console.log(`Attempting to unban user ${userId} from channel ${channelId}`);
         await bot.unbanChatMember(channelId, userId);
         // إضافة تأخير قدره 1 ثانية بين كل عملية إزالة
         await delay(1000);
-        console.log(`User ${userId} unbanned from channel ${channelId}`);
       } catch (error) {
         console.error(`Failed to unban user ${userId} from channel ${channelId}:`, error);
       }
@@ -323,8 +316,8 @@ bot.on('chat_join_request', (request) => {
   handleJoinRequests(request);
 });
 
-// جدولة إعادة التحقق من الاشتراكات يوميًا عند منتصف الليل
-cron.schedule('20 0 * * *', () => {
+// جدولة إعادة التحقق من الاشتراكات يوميًا عند الساعة 12:29 صباحًا
+cron.schedule('49 0 * * *', () => {
   console.log('Running daily subscription check');
   checkUserSubscriptions();
 });

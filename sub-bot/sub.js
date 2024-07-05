@@ -242,7 +242,6 @@ bot.onText(/\/start/, (msg) => {
           parse_mode: 'Markdown'
         }).catch((error) => {
           if (error.response.body.error_code === 400 && error.response.body.description.includes("message is not modified")) {
-
           }
         });
       }
