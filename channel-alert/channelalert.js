@@ -68,6 +68,17 @@ urls.forEach(url => {
   productStatus[url] = { isAvailable: false, lastNotificationTime: 0, messageId: null, individualCooldownTime: 0, isNotifying: false };
 });
 
+function isWithinTimeRange(startHour, startMinute, endHour, endMinute) {
+  const now = new Date();
+  const startTime = new Date(now);
+  startTime.setHours(startHour, startMinute, 0, 0);
+  const endTime = new Date(now);
+  endTime.setHours(endHour, endMinute, 0, 0);
+
+  return now >= startTime && now <= endTime;
+}
+
+
 async function checkProductAvailability(url) {
   try {
     const { data } = await axios.get(url);
@@ -313,7 +324,7 @@ bot.on('chat_join_request', (request) => {
 });
 
 // جدولة إعادة التحقق من الاشتراكات يوميًا عند منتصف الليل
-cron.schedule('10 12 * * *', () => {
+cron.schedule('12 12 * * *', () => {
   console.log('Running daily subscription check');
   checkUserSubscriptions();
 });
