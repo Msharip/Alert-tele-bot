@@ -22,8 +22,9 @@ const activeUsers = new Map();
 const userClicks = new Map();
 
 const rateLimiter = new rateLimit.RateLimiterMemory({
-  points: 2, // عدد النقاط
-  duration: 6.5, // المدة بالثواني
+  points: 1, // عدد النقاط المتاحة لكل فترة
+  duration: 2.5, // المدة بالثواني لكل نقطة
+  blockDuration: 10, // مدة الحظر بالثواني إذا تم تجاوز عدد النقاط المسموح بها
 });
 
 async function activateUserSubscription(userId, code, duration, callback) {
@@ -209,6 +210,7 @@ bot.onText(/\/start/, (msg) => {
     parse_mode: 'Markdown'
   });
 
+
   bot.on('callback_query', async (callbackQuery) => {
     const msg = callbackQuery.message;
     const data = callbackQuery.data;
@@ -240,9 +242,7 @@ bot.onText(/\/start/, (msg) => {
           parse_mode: 'Markdown'
         }).catch((error) => {
           if (error.response.body.error_code === 400 && error.response.body.description.includes("message is not modified")) {
-            // تجاهل الخطأ إذا كانت الرسالة غير معدلة
-          } else {
-            console.error('Error editing message:', error);
+
           }
         });
       }
