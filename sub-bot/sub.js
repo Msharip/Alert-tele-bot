@@ -1,7 +1,9 @@
 const TelegramBot = require('node-telegram-bot-api');
 const mysql = require('mysql2/promise');
 const cron = require('node-cron');
+const rateLimit = require('rate-limiter-flexible');
 require('dotenv').config();
+
 
 const dbConfig = {
   host: process.env.DB_HOST,
@@ -14,8 +16,15 @@ const dbConfig = {
 const token = process.env.TOKEN4;
 const bot = new TelegramBot(token, { polling: true });
 
-// إنشاء مجموعة من الاتصالات
 const pool = mysql.createPool(dbConfig);
+
+const activeUsers = new Map();
+const userClicks = new Map();
+
+const rateLimiter = new rateLimit.RateLimiterMemory({
+  points: 2, // عدد النقاط
+  duration: 6.5, // المدة بالثواني
+});
 
 async function activateUserSubscription(userId, code, duration, callback) {
   let connection;
@@ -47,7 +56,6 @@ async function activateUserSubscription(userId, code, duration, callback) {
       callback(`**تم تفعيل اشتراكك بنجاح لمدة ${Math.abs(duration)} ${duration < 0 ? 'يوم' : 'أشهر'}.** 🎉`);
     }
 
-    // تحديث حالة الاشتراك إلى نشط
     await connection.execute('UPDATE users SET activated = true WHERE id = ?', [userId]);
   } catch (err) {
     if (connection) await connection.rollback();
@@ -110,9 +118,6 @@ async function deleteActivationCode(connection, code) {
   const deleteQuery = 'DELETE FROM activationcodes WHERE activation_code = ?';
   await connection.execute(deleteQuery, [code]);
 }
-
-const activeUsers = new Map();
-const userClicks = new Map();
 
 bot.onText(/\/start/, (msg) => {
   const chatId = msg.chat.id;
@@ -204,38 +209,29 @@ bot.onText(/\/start/, (msg) => {
     parse_mode: 'Markdown'
   });
 
-  bot.on('callback_query', (callbackQuery) => {
+  bot.on('callback_query', async (callbackQuery) => {
     const msg = callbackQuery.message;
     const data = callbackQuery.data;
     const callbackUserId = callbackQuery.from.id;
-
     if (callbackUserId !== userId) return;
-
-    // تحديث عدد النقرات للمستخدم
-    if (data !== 'start') {
-      if (!userClicks.has(callbackUserId)) {
-        userClicks.set(callbackUserId, 0);
-      }
-      userClicks.set(callbackUserId, userClicks.get(callbackUserId) + 1);
-
-      if (userClicks.get(callbackUserId) > 8 ) {
+  
+    // التحقق من النقر المتتالي السريع
+    if (data !== 'start') { // استثناء زر الرجوع من التحقق
+      try {
+        await rateLimiter.consume(callbackUserId.toString());
+      } catch (rateLimiterRes) {
         bot.answerCallbackQuery(callbackQuery.id, {
-          text: '  ⚠️\n لاتقم بالضغط على الازرار بسرعه كبيره \n سيتم ايقاف البوت لمده 10 ثواني',
+          text: '⚠️\n\nلاتقم بالضغط على الأزرار بشكل متتالي\n\nسيتم إيقاف البوت لمدة 10 ثواني',
           show_alert: true
         });
-        // إيقاف استجابة البوت لمدة 10 ثوانٍ
-        setTimeout(() => {
-          userClicks.set(callbackUserId, 0); // إعادة تعيين عداد النقرات بعد انتهاء المهلة
-        }, 10000); // 10000 ميلي ثانية = 10 ثوانٍ
-
         return;
       }
     }
-
+  
     const updateMessage = (text, keyboard, msg) => {
       const isContentDifferent = msg.text !== text;
       const isKeyboardDifferent = JSON.stringify(msg.reply_markup) !== JSON.stringify(keyboard);
-
+  
       if (isContentDifferent || isKeyboardDifferent) {
         bot.editMessageText(text, {
           chat_id: msg.chat.id,
@@ -244,7 +240,9 @@ bot.onText(/\/start/, (msg) => {
           parse_mode: 'Markdown'
         }).catch((error) => {
           if (error.response.body.error_code === 400 && error.response.body.description.includes("message is not modified")) {
+            // تجاهل الخطأ إذا كانت الرسالة غير معدلة
           } else {
+            console.error('Error editing message:', error);
           }
         });
       }
@@ -420,9 +418,9 @@ async function handleFreeTrial(userId, callback) {
       if (user.trial_used) {
         callback('لقد استخدمت التجربة المجانية مسبقًا ⚠️.\n\nبامكانك الاشتراك من هنا:\n[رابط المتجر] او الضغط على زر المتجر👇🏻\n\n https://www.dzrt.com/ar/our-products.html', true);
       } else if (user.activated) {
-        callback('لديك اشتراك نشط حاليًا ⚠️.', false);
+        callback('لديك اشتراك نشط حاليًا ⚠️.', true);
       } else if (trialCount >= 20) {
-        callback('لقد تم استخدام جميع الاشتراكات التجريبية المجانية لهذا اليوم ⚠️.', false);
+        callback('لقد تم استخدام جميع الاشتراكات التجريبية المجانية لهذا اليوم ⚠️.', true);
       } else {
         await activateFreeTrial(userId, connection);
         await connection.execute('UPDATE trial_usage SET count = count + 1 WHERE id = 1');
@@ -433,7 +431,7 @@ async function handleFreeTrial(userId, callback) {
       const trialCount = trialCountResult[0].count;
 
       if (trialCount >= 20) {
-        callback('لقد تم استخدام جميع الاشتراكات التجريبية المجانية لهذا اليوم ⚠️.\n\n يوميا الساعه 12 ظهرا سيتم اعادة تعيين التجربة الى اول 20 شخص', false);
+        callback('لقد تم استخدام جميع الاشتراكات التجريبية المجانية لهذا اليوم ⚠️.\n\n يوميا الساعه 12 ظهرا سيتم اعادة تعيين التجربة الى اول 20 شخص', true);
       } else {
         await activateFreeTrial(userId, connection);
         await connection.execute('UPDATE trial_usage SET count = 0 WHERE id = 1');
@@ -451,7 +449,7 @@ async function handleFreeTrial(userId, callback) {
 async function activateFreeTrial(userId, connection) {
   const startDate = new Date().toISOString().split('T')[0];
   let expiryDate = new Date();
-  expiryDate.setDate(expiryDate.getDate() + 1);
+  expiryDate.setHours(23, 59, 59, 999); // تعيين وقت الانتهاء ليكون في نهاية اليوم الحالي
 
   const insertOrUpdateQuery = `
     INSERT INTO users (id, activated, subscriptionType, startDate, expiryDate, trial_used)

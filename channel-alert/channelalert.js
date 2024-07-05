@@ -172,7 +172,6 @@ setInterval(() => {
 }, resetCooldownInterval);
 
 
-
 const dbConfig = {
   host: process.env.DB_HOST,
   user: process.env.DB_USER,
@@ -180,11 +179,8 @@ const dbConfig = {
   database: process.env.DB_DATABASE,
   port: process.env.DB_PORT
 };
-
-// دالة تأخير باستخدام Promise
-function delay(ms) {
-  return new Promise(resolve => setTimeout(resolve, ms));
-}
+// إنشاء مجموعة من الاتصالات
+const pool = mysql.createPool(dbConfig);
 
 async function checkUserSubscriptions() {
   const currentDate = new Date().toISOString().split('T')[0];
@@ -192,13 +188,13 @@ async function checkUserSubscriptions() {
   let connection;
 
   try {
-    connection = await mysql.createConnection(dbConfig);
+    connection = await pool.getConnection();
     const [results] = await connection.query(query);
     const usersToUnban = results.filter(user => new Date(user.expiryDate) < new Date(currentDate));
 
     for (const user of usersToUnban) {
       const channelIds = [
-        process.env.MAIN_CHANNEL_ID,
+        process.env.CHAT_ID_MAIN,  // تأكيد إضافة القناة الأساسية هنا
         process.env.CHAT_ID_ICY_RUSH,
         process.env.CHAT_ID_SEASIDE,
         process.env.CHAT_ID_SAMRA,
@@ -212,36 +208,57 @@ async function checkUserSubscriptions() {
       ];
 
       try {
+        // إزالة المستخدم من جميع القنوات تدريجيًا
         await unbanUserFromAllChannels(user.id, channelIds);
 
-        // الانتظار لمدة 10 ثواني
-        await delay(10000);
+        console.log(`User ${user.id} has been removed from all channels, including the main channel ${mainChannelId}.`);
 
-        const deactivateQuery = 'UPDATE users SET activated = 0 WHERE id = ?';
-        await connection.query(deactivateQuery, [user.id]);
+        // تحديث حالة الاشتراك في قاعدة البيانات
+        await deactivateUserSubscription(user.id);
+
+        console.log(`User ${user.id} subscription has been deactivated.`);
       } catch (error) {
-        console.error(`Failed to remove user ${user.id} from all channels:`, error);
+        console.error(`Failed to process user ${user.id}:`, error);
       }
     }
   } catch (err) {
     console.error('Error reading subscriptions from database:', err);
   } finally {
     if (connection) {
-      await connection.end();
+      connection.release();
     }
   }
 }
 
 async function unbanUserFromAllChannels(userId, channelIds) {
-  const unbanPromises = channelIds.map(channelId => {
+  for (const channelId of channelIds) {
     if (channelId) {
-      return bot.unbanChatMember(channelId, userId);
-    } else {
-      return Promise.resolve();
+      try {
+        console.log(`Attempting to unban user ${userId} from channel ${channelId}`);
+        await bot.unbanChatMember(channelId, userId);
+        // إضافة تأخير قدره 1 ثانية بين كل عملية إزالة
+        await delay(1000);
+        console.log(`User ${userId} unbanned from channel ${channelId}`);
+      } catch (error) {
+        console.error(`Failed to unban user ${userId} from channel ${channelId}:`, error);
+      }
     }
-  });
+  }
+}
 
-  await Promise.all(unbanPromises);
+async function deactivateUserSubscription(userId) {
+  let connection;
+  try {
+    connection = await pool.getConnection();
+    const deactivateQuery = 'UPDATE users SET activated = 0 WHERE id = ?';
+    await connection.query(deactivateQuery, [userId]);
+  } catch (err) {
+    console.error('Error deactivating subscription:', err);
+  } finally {
+    if (connection) {
+      connection.release();
+    }
+  }
 }
 
 async function handleJoinRequests(request) {
@@ -252,7 +269,7 @@ async function handleJoinRequests(request) {
     let connection;
 
     try {
-      connection = await mysql.createConnection(dbConfig);
+      connection = await pool.getConnection();
       const [results] = await connection.query(query, [userId]);
 
       if (results.length > 0) {
@@ -266,7 +283,7 @@ async function handleJoinRequests(request) {
       console.error('Error reading subscriptions from database:', err);
     } finally {
       if (connection) {
-        await connection.end();
+        connection.release();
       }
     }
   }
@@ -281,7 +298,7 @@ async function approveJoinRequestWithDelay(channelId, userId) {
       } catch (error) {
         reject(error);
       }
-    }, 5000); // Adding a delay of 5 seconds
+    }, 5000); // إضافة تأخير قدره 5 ثواني
   });
 }
 
@@ -289,8 +306,12 @@ bot.on('chat_join_request', (request) => {
   handleJoinRequests(request);
 });
 
-cron.schedule('31 2 * * *', () => {
+// جدولة إعادة التحقق من الاشتراكات يوميًا عند منتصف الليل
+cron.schedule('21 7 * * *', () => {
   console.log('Running daily subscription check');
   checkUserSubscriptions();
 });
 
+function delay(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
