@@ -23,7 +23,7 @@ const userClicks = new Map();
 
 const rateLimiter = new rateLimit.RateLimiterMemory({
   points: 1, // عدد النقاط المتاحة لكل فترة
-  duration: 2.5, // المدة بالثواني لكل نقطة
+  duration: 2.4, // المدة بالثواني لكل نقطة
   blockDuration: 10, // مدة الحظر بالثواني إذا تم تجاوز عدد النقاط المسموح بها
 });
 
@@ -223,7 +223,7 @@ bot.onText(/\/start/, (msg) => {
         await rateLimiter.consume(callbackUserId.toString());
       } catch (rateLimiterRes) {
         bot.answerCallbackQuery(callbackQuery.id, {
-          text: '⚠️\n\nلاتقم بالضغط على الأزرار بشكل متتالي\n\nسيتم إيقاف البوت لمدة 10 ثواني',
+          text: '⚠️\n\nتجنب النقر المتتالي على الأزرار \n\n تم إيقاف البوت لمدة قصيرة',
           show_alert: true
         });
         return;
