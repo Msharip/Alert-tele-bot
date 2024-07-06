@@ -7,19 +7,16 @@ const mysql = require('mysql2/promise');
 require('dotenv').config();
 
 const productNames = {
-  'https://www.dzrt.com/ar/icy-rush.html': { ar: 'آيسي رش', en: 'icy-rush'  },
+  'https://www.dzrt.com/ar/icy-rush.html': { ar: 'آيسي رش', en: 'icy-rush' },
   'https://www.dzrt.com/ar/seaside-frost.html': { ar: 'سي سايد فروست', en: 'seaside-frost' },
   'https://www.dzrt.com/ar/highland-berries.html': { ar: 'هايلاند بيريز', en: 'highland-berries' },
   'https://www.dzrt.com/ar/garden-mint.html': { ar: 'جاردن منت', en: 'garden-mint' },
   'https://www.dzrt.com/ar/mint-fusion.html': { ar: 'منت فيوجن', en: 'mint-fusion' },
-  'https://www.dzrt.com/ar/haila.html': { ar: ' هيلة', en: 'haila' },
-  'https://www.dzrt.com/ar/samra.html': { ar: 'سمرة ', en: 'samra' },
+  'https://www.dzrt.com/ar/haila.html': { ar: 'هيلة', en: 'haila' },
+  'https://www.dzrt.com/ar/samra.html': { ar: 'سمرة', en: 'samra' },
   'https://www.dzrt.com/ar/purple-mist.html': { ar: 'بيربل مست', en: 'purple-mist' },
-  'https://www.dzrt.com/ar/edgy-mint.html': { ar: 'ايدجي منت ', en: 'edgy-mint' },
+  'https://www.dzrt.com/ar/edgy-mint.html': { ar: 'ايدجي منت', en: 'edgy-mint' },
   'https://www.dzrt.com/ar/tamra.html': { ar: 'تمرة', en: 'tamra' }
-
-
-
 };
 
 const urls = [
@@ -33,31 +30,24 @@ const urls = [
   'https://www.dzrt.com/ar/purple-mist.html',
   'https://www.dzrt.com/ar/edgy-mint.html',
   'https://www.dzrt.com/ar/tamra.html'
-
-  
 ];
 
 const channels = {
   'https://www.dzrt.com/ar/icy-rush.html': { ar: 'آيسي رش', en: 'icy-rush', chatId: process.env.CHAT_ID_ICY_RUSH },
   'https://www.dzrt.com/ar/seaside-frost.html': { ar: 'سي سايد فروست', en: 'seaside-frost', chatId: process.env.CHAT_ID_SEASIDE },
-  'https://www.dzrt.com/ar/highland-berries.html': { ar: 'هايلاند بيريز', en: 'highland-berries' , chatId: process.env.CHAT_ID_HIGH },
+  'https://www.dzrt.com/ar/highland-berries.html': { ar: 'هايلاند بيريز', en: 'highland-berries', chatId: process.env.CHAT_ID_HIGH },
   'https://www.dzrt.com/ar/garden-mint.html': { ar: 'جاردن منت', en: 'garden-mint', chatId: process.env.CHAT_ID_GARDEN },
   'https://www.dzrt.com/ar/mint-fusion.html': { ar: 'منت فيوجن', en: 'mint-fusion', chatId: process.env.CHAT_ID_MINT },
-  'https://www.dzrt.com/ar/haila.html': { ar: ' هيلة', en: 'haila', chatId: process.env.CHAT_ID_HAILA },
+  'https://www.dzrt.com/ar/haila.html': { ar: 'هيلة', en: 'haila', chatId: process.env.CHAT_ID_HAILA },
   'https://www.dzrt.com/ar/samra.html': { ar: 'سمرة', en: 'samra', chatId: process.env.CHAT_ID_SAMRA },
   'https://www.dzrt.com/ar/purple-mist.html': { ar: 'بيربل مست', en: 'purple-mist', chatId: process.env.CHAT_ID_PURPPLE },
-  'https://www.dzrt.com/ar/edgy-mint.html': { ar: 'ايدجي منت ', en: 'edgy-mint', chatId: process.env.CHAT_ID_EDGY },
-  'https://www.dzrt.com/ar/tamra.html': { ar: ' تمرة ', en: 'tamra', chatId: process.env.CHAT_ID_TAMRA },
-
-
-
+  'https://www.dzrt.com/ar/edgy-mint.html': { ar: 'ايدجي منت', en: 'edgy-mint', chatId: process.env.CHAT_ID_EDGY },
+  'https://www.dzrt.com/ar/tamra.html': { ar: 'تمرة', en: 'tamra', chatId: process.env.CHAT_ID_TAMRA }
 };
 
 const mainChannelId = process.env.CHAT_ID_MAIN;
 const token = process.env.TOKEN3;
 const bot = new TelegramBot(token, { polling: true });
-
-
 
 const productCooldown = 10 * 60 * 1000; // فترة التهدئة لكل منتج على حدة: 10 دقائق بالمللي ثانية
 const resetCooldownInterval = 5 * 60 * 1000; // فترة التحقق إذا ظلت جميع المنتجات غير متوفرة: 5 دقائق بالمللي ثانية
@@ -77,7 +67,6 @@ function isWithinTimeRange(startHour, startMinute, endHour, endMinute) {
 
   return now >= startTime && now <= endTime;
 }
-
 
 async function checkProductAvailability(url) {
   try {
@@ -149,7 +138,7 @@ async function checkProductAvailability(url) {
 async function checkAllUrls() {
   for (const url of urls) {
     // تحقق من الوقت لتحديد ما إذا كان ينبغي تخطي الفحص لهذا المنتج
-    if (url === 'https://www.dzrt.com/ar/edgy-mint.html' && isWithinTimeRange(11, 50, 12, 0)) {
+    if (url === 'https://www.dzrt.com/ar/edgy-mint.html' && (isWithinTimeRange(11, 50, 12, 0) || isWithinTimeRange(23, 56, 23, 59))) {
       continue;
     }
     if (!productStatus[url].isNotifying) { // التحقق من أن المنتج ليس قيد الإشعار
@@ -166,18 +155,7 @@ function resetCooldownsIfAllUnavailable() {
     }
   }
 }
-async function checkAllUrls() {
-  for (const url of urls) {
-    // تحقق من الوقت لتحديد ما إذا كان ينبغي تخطي الفحص لهذا المنتج
-    if (url === 'https://www.dzrt.com/ar/edgy-mint.html' && isWithinTimeRange(11, 50, 12, 0)) {
-      console.log('Skipping check for Edgy Mint during the specified time range.');
-      continue;
-    }
-    if (!productStatus[url].isNotifying) { // التحقق من أن المنتج ليس قيد الإشعار
-      await checkProductAvailability(url);
-    }
-  }
-}
+
 // جدولة الفحص ليعمل كل ثانية
 cron.schedule('* * * * * *', () => {
   checkAllUrls();
