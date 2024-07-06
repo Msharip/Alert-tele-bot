@@ -3,7 +3,9 @@ const cheerio = require('cheerio-without-node-native');
 const TelegramBot = require('node-telegram-bot-api');
 const cron = require('node-cron');
 const path = require('path');
+const mysql = require('mysql2/promise');
 require('dotenv').config();
+
 
 const productNames = {
   'https://www.dzrt.com/ar/icy-rush.html': { ar: 'آيسي رش', en: 'icy-rush' },
@@ -170,6 +172,8 @@ cron.schedule('*/1 * 13-21 * * *', () => {
 cron.schedule('*/5 * 13-21 * * *', () => {
   resetCooldownsIfAllUnavailable();
 });
+
+
 
 
 const dbConfig = {

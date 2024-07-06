@@ -50,7 +50,6 @@ async function checkProductAvailability(url) {
     const $ = cheerio.load(data);
     const isUnavailable = $('div.stock.unavailable span').length > 0;
     const currentTime = Date.now();
-    
     if (productNames[url]) {
       const productNameAr = productNames[url].ar;
       const imageUrl = path.join(__dirname, 'images', `${productNames[url].en}.png`);
@@ -70,7 +69,6 @@ async function checkProductAvailability(url) {
         const tweetMessage = `${productNameAr} - متوفر الآن ✅! #دزرت #تنبيه \n${url}`;
         const mediaId = await twitterClient.v1.uploadMedia(imageUrl); // تحميل الصورة إلى تويتر
         await twitterClient.v2.tweet({ text: tweetMessage, media: { media_ids: [mediaId] } });
-
       } else if (isUnavailable && productStatus[url].isAvailable) {
         // المنتج غير متوفر الآن ولكنه كان متوفرًا في الفحص السابق
         productStatus[url].isAvailable = false;
