@@ -108,9 +108,8 @@ async function checkAllUrls() {
   resetCooldownsIfAllUnavailable();
 }
 
-// جدولة الفحص ليعمل كل ثانية
-cron.schedule('* * * * * *', () => {
+// جدولة الفحص ليعمل كل ثانية بين الساعة 1 ظهراً والساعة 9 مساءً
+cron.schedule('*/1 * * 13-21 * * *', () => {
   checkAllUrls();
 });
-
 
