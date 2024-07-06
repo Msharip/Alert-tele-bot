@@ -6,17 +6,15 @@ const { TwitterApi } = require('twitter-api-v2');
 const path = require('path');
 
 const productNames = {
-
-
   'https://www.dzrt.com/ar/icy-rush.html': { ar: 'آيسي رش', en: 'icy-rush' },
   'https://www.dzrt.com/ar/seaside-frost.html': { ar: 'سي سايد فروست', en: 'seaside-frost' },
   'https://www.dzrt.com/ar/highland-berries.html': { ar: 'هايلاند بيريز', en: 'highland-berries' },
   'https://www.dzrt.com/ar/garden-mint.html': { ar: 'جاردن منت', en: 'garden-mint' },
   'https://www.dzrt.com/ar/mint-fusion.html': { ar: 'منت فيوجن', en: 'mint-fusion' },
-  'https://www.dzrt.com/ar/haila.html': { ar: ' هيلة', en: 'haila' },
-  'https://www.dzrt.com/ar/samra.html': { ar: 'سمرة ', en: 'samra' },
-
+  'https://www.dzrt.com/ar/haila.html': { ar: 'هيلة', en: 'haila' },
+  'https://www.dzrt.com/ar/samra.html': { ar: 'سمرة', en: 'samra' },
 };
+
 const urls = [
   'https://www.dzrt.com/ar/icy-rush.html',
   'https://www.dzrt.com/ar/seaside-frost.html',
@@ -26,10 +24,11 @@ const urls = [
   'https://www.dzrt.com/ar/haila.html',
   'https://www.dzrt.com/ar/samra.html'
 ];
+
 const token = '6749756089:AAFMCjy0-85EkyQIrzC4tJU5jIyFJvpnLEI';
 const chatId = '-1002122565496';
 const bot = new TelegramBot(token, { polling: true });
-const productCooldown = 20 * 60 * 1000; // فترة التهدئة لكل منتج على حدة: 25 دقيقة بالمللي ثانية
+const productCooldown = 20 * 60 * 1000; // فترة التهدئة لكل منتج على حدة: 20 دقيقة بالمللي ثانية
 let productStatus = {};
 let lastAllUnavailableTime = 0;
 
@@ -57,6 +56,7 @@ async function checkProductAvailability(url) {
 
       if (!isUnavailable && (currentTime - productStatus[url].individualCooldownTime > productCooldown)) {
         // المنتج متوفر الآن وفترة التهدئة الفردية قد انقضت
+        const message = `*${productNameAr}* - متوفر الآن ✅ \n[ أضغط هنا ](${url})`;
         const sentMessage = await bot.sendPhoto(chatId, imageUrl, { caption: message, parse_mode: 'Markdown' });
         
         productStatus[url] = {
@@ -77,6 +77,7 @@ async function checkProductAvailability(url) {
       }
     }
   } catch (error) {
+    console.error(`Error checking product availability for ${url}: `, error);
   }
 }
 
@@ -110,9 +111,7 @@ async function checkAllUrls() {
   resetCooldownsIfAllUnavailable();
 }
 
-// جدولة الفحص ليعمل كل ثانية
-cron.schedule('* * * * * *', () => {
+// جدولة الفحص ليعمل كل ثانية بين الساعة 1 ظهراً والساعة 9 مساءً
+cron.schedule('*/1 * 13-21 * * *', () => {
   checkAllUrls();
 });
-
-
