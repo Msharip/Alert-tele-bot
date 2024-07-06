@@ -210,15 +210,14 @@ bot.onText(/\/start/, (msg) => {
     parse_mode: 'Markdown'
   });
 
-
   bot.on('callback_query', async (callbackQuery) => {
     const msg = callbackQuery.message;
     const data = callbackQuery.data;
     const callbackUserId = callbackQuery.from.id;
     if (callbackUserId !== userId) return;
   
-    // التحقق من النقر المتتالي السريع
-    if (data !== 'start') { // استثناء زر الرجوع من التحقق
+    // التحقق من النقر المتتالي السريع باستثناء أوامر معينة
+    if (data !== 'start' && data !== 'notification_channels_command') {
       try {
         await rateLimiter.consume(callbackUserId.toString());
       } catch (rateLimiterRes) {
@@ -363,6 +362,7 @@ bot.onText(/\/start/, (msg) => {
   });
 });
 
+
 async function getSubscriptionStatus(userId, callback) {
   let connection;
   try {
@@ -471,4 +471,3 @@ cron.schedule('0 12 * * *', async () => {
     if (connection) connection.release();
   }
 });
-
