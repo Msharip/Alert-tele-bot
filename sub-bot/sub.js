@@ -413,6 +413,7 @@ async function handleFreeTrial(userId, callback) {
       const user = results[0];
       const [trialCountResult] = await connection.execute('SELECT count FROM trial_usage WHERE id = 1');
       const trialCount = trialCountResult[0].count;
+      console.log('Current trial count:', trialCount);
 
       if (user.trial_used) {
         callback('لقد استخدمت التجربة المجانية مسبقًا ⚠️.\n\nبامكانك الاشتراك من هنا:\n[رابط المتجر] او الضغط على زر المتجر👇🏻\n\n https://www.dzrt.com/ar/our-products.html', true);
@@ -423,6 +424,7 @@ async function handleFreeTrial(userId, callback) {
       } else {
         await activateFreeTrial(userId, connection);
         await connection.execute('UPDATE trial_usage SET count = count + 1 WHERE id = 1');
+        console.log('Trial count after update:', trialCount + 1);
         callback('تم تفعيل الاشتراك التجريبي المجاني ليوم واحد بنجاح 🎉 \n\n  قم بالضغط على قنوات التنبيهات وانضم الى ماترغب به', true);
       }
     } else {
@@ -433,7 +435,7 @@ async function handleFreeTrial(userId, callback) {
         callback('لقد تم استخدام جميع الاشتراكات التجريبية المجانية لهذا اليوم ⚠️.\n\n يوميا الساعه 12 ظهرا سيتم اعادة تعيين التجربة الى اول 20 شخص', true);
       } else {
         await activateFreeTrial(userId, connection);
-        await connection.execute('UPDATE trial_usage SET count = 0 WHERE id = 1');
+        await connection.execute('UPDATE trial_usage SET count = count + 1 WHERE id = 1');
         callback('تم تفعيل الاشتراك التجريبي المجاني ليوم واحد بنجاح 🎉 \n\n قم بالضغط على قنوات التنبيهات وانضم الى ماترغب به', true);
       }
     }
@@ -464,10 +466,10 @@ cron.schedule('0 12 * * *', async () => {
   try {
     connection = await pool.getConnection();
     await connection.execute('UPDATE trial_usage SET count = 0 WHERE id = 1');
-    console.log('تم إعادة تعيين العداد اليومي للاشتراكات التجريبية المجانية.');
   } catch (err) {
     console.error('Error resetting trial count:', err);
   } finally {
     if (connection) connection.release();
   }
 });
+
