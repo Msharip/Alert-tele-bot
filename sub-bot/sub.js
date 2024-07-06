@@ -24,7 +24,7 @@ const userClicks = new Map();
 const rateLimiter = new rateLimit.RateLimiterMemory({
   points: 1, // عدد النقاط المتاحة لكل فترة
   duration: 2, // المدة بالثواني لكل نقطة
-  blockDuration: 10, // مدة الحظر بالثواني إذا تم تجاوز عدد النقاط المسموح بها
+  blockDuration: 15, // مدة الحظر بالثواني إذا تم تجاوز عدد النقاط المسموح بها
 });
 
 async function activateUserSubscription(userId, code, duration, callback) {
