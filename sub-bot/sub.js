@@ -413,7 +413,6 @@ async function handleFreeTrial(userId, callback) {
       const user = results[0];
       const [trialCountResult] = await connection.execute('SELECT count FROM trial_usage WHERE id = 1');
       const trialCount = trialCountResult[0].count;
-      console.log('Current trial count:', trialCount);
 
       if (user.trial_used) {
         callback('لقد استخدمت التجربة المجانية مسبقًا ⚠️.\n\nبامكانك الاشتراك من هنا:\n[رابط المتجر] او الضغط على زر المتجر👇🏻\n\n https://www.dzrt.com/ar/our-products.html', true);
@@ -461,7 +460,7 @@ async function activateFreeTrial(userId, connection) {
 }
 
 // جدولة إعادة تعيين العداد عند الساعة 12 ظهرًا
-cron.schedule('27 5 * * *', async () => {
+cron.schedule('31 5 * * *', async () => {
   let connection;
   try {
     connection = await pool.getConnection();
