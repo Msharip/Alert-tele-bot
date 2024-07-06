@@ -461,7 +461,7 @@ async function activateFreeTrial(userId, connection) {
 }
 
 // جدولة إعادة تعيين العداد عند الساعة 12 ظهرًا
-cron.schedule('08 5 * * *', async () => {
+cron.schedule('15 5 * * *', async () => {
   let connection;
   try {
     connection = await pool.getConnection();
