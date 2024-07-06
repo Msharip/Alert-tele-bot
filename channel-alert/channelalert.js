@@ -6,7 +6,6 @@ const path = require('path');
 const mysql = require('mysql2/promise');
 require('dotenv').config();
 
-
 const productNames = {
   'https://www.dzrt.com/ar/icy-rush.html': { ar: 'آيسي رش', en: 'icy-rush' },
   'https://www.dzrt.com/ar/seaside-frost.html': { ar: 'سي سايد فروست', en: 'seaside-frost' },
@@ -50,10 +49,9 @@ const mainChannelId = process.env.CHAT_ID_MAIN;
 const token = process.env.TOKEN3;
 const bot = new TelegramBot(token, { polling: true });
 
-const productCooldown = 10 * 60 * 1000; // فترة التهدئة لكل منتج على حدة: 10 دقائق بالمللي ثانية
+const productCooldown = 20 * 60 * 1000; // فترة التهدئة لكل منتج على حدة: 20 دقائق بالمللي ثانية
 
 let productStatus = {};
-
 urls.forEach(url => {
   productStatus[url] = { isAvailable: false, lastNotificationTime: 0, isNotifying: false, isOutOfStockNotified: false, individualCooldownTime: 0 };
 });
@@ -69,12 +67,11 @@ async function checkProductAvailability(url) {
       const productNameAr = productNames[url].ar;
       const imageUrlAvailable = path.join(__dirname, '..', 'images', `${productNames[url].en}.png`);
       const imageUrlUnavailable = path.join(__dirname, '..', 'images', `${productNames[url].en}-outofstock.png`);
-      
 
       if (!isUnavailable && (currentTime - productStatus[url].individualCooldownTime > productCooldown)) {
         // المنتج متوفر الآن وفترة التهدئة الفردية قد انقضت
         const message = `*${productNameAr}* - متوفر الآن ✅`;
-        console.log(`Sending notification for ${productNameAr}`);
+        console.log(`*${productNameAr}* - متوفر الآن ✅`);
         
         const replyMarkup = {
           inline_keyboard: [
@@ -116,23 +113,27 @@ async function checkProductAvailability(url) {
         }, productCooldown);
       } else if (isUnavailable && productStatus[url].isAvailable) {
         // المنتج غير متوفر الآن ولكنه كان متوفرًا في الفحص السابق
-        if (!productStatus[url].isOutOfStockNotified) {
-          const message = `*${productNameAr}* - نفد من المخزون ❌`;
+        setTimeout(async () => {
+          const { data: newData } = await axios.get(url);
+          const new$ = cheerio.load(newData);
+          const stillUnavailable = new$('div.stock.unavailable span').length > 0;
           
-          await bot.sendPhoto(channels[url].chatId, imageUrlUnavailable, {
-            caption: message,
-            parse_mode: 'Markdown'
-          });
+          if (stillUnavailable) {
+            const message = `*${productNameAr}* - نفد من المخزون ❌`;
+            
+            await bot.sendPhoto(channels[url].chatId, imageUrlUnavailable, {
+              caption: message,
+              parse_mode: 'Markdown'
+            });
 
-          productStatus[url].isOutOfStockNotified = true; // تعيين العلم لمنع تكرار الإشعارات
-          productStatus[url].individualCooldownTime = 0; // إعادة تعيين فترة التهدئة الفردية
-        }
-
-        productStatus[url].isAvailable = false;
+            productStatus[url].isOutOfStockNotified = true; // تعيين العلم لمنع تكرار الإشعارات
+            productStatus[url].individualCooldownTime = 0; // إعادة تعيين فترة التهدئة الفردية
+            productStatus[url].isAvailable = false;
+          }
+        }, 15000); // الانتظار لمدة 15 ثانية قبل إرسال إشعار نفاد المنتج
       }
     }
   } catch (error) {
-    console.error(`Error checking product availability for ${url}: ${error}`);
   }
 }
 
@@ -143,14 +144,10 @@ async function checkAllUrls() {
     }
   }
 }
-
 // جدولة الفحص ليعمل كل ثانية بين الساعة 1 ظهراً والساعة 9 مساءً
 cron.schedule('*/1 * * 13-21 * * *', () => {
   checkAllUrls();
 });
-
-
-
 
 
 
