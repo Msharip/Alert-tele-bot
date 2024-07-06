@@ -4,8 +4,7 @@ const app = express();
 
 require('./channel-alert/channelalert.js');
 require('./sub-bot/sub.js');
-
-
+require('./tele/telexboxv.js');
 
 
 console.log('all Bots are Ruuning');
