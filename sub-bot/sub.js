@@ -4,7 +4,7 @@ const cron = require('node-cron');
 const rateLimit = require('rate-limiter-flexible');
 require('dotenv').config();
 
-
+// إعدادات قاعدة البيانات
 const dbConfig = {
   host: process.env.DB_HOST,
   user: process.env.DB_USER,
@@ -27,6 +27,7 @@ const rateLimiter = new rateLimit.RateLimiterMemory({
   blockDuration: 15, // مدة الحظر بالثواني إذا تم تجاوز عدد النقاط المسموح بها
 });
 
+// تفعيل اشتراك المستخدم
 async function activateUserSubscription(userId, code, duration, callback) {
   let connection;
   try {
@@ -67,6 +68,7 @@ async function activateUserSubscription(userId, code, duration, callback) {
   }
 }
 
+// تمديد اشتراك المستخدم
 async function extendUserSubscription(connection, userId, code, duration, callback) {
   try {
     const [existingUsers] = await connection.execute('SELECT * FROM users WHERE id = ?', [userId]);
@@ -115,11 +117,13 @@ async function extendUserSubscription(connection, userId, code, duration, callba
   }
 }
 
+// حذف كود التفعيل
 async function deleteActivationCode(connection, code) {
   const deleteQuery = 'DELETE FROM activationcodes WHERE activation_code = ?';
   await connection.execute(deleteQuery, [code]);
 }
 
+// استقبال أوامر المستخدم
 bot.onText(/\/start/, (msg) => {
   const chatId = msg.chat.id;
   const userId = msg.from.id;
@@ -215,7 +219,7 @@ bot.onText(/\/start/, (msg) => {
     const data = callbackQuery.data;
     const callbackUserId = callbackQuery.from.id;
     if (callbackUserId !== userId) return;
-  
+
     // التحقق من النقر المتتالي السريع باستثناء أوامر معينة
     if (data !== 'start' && data !== 'notification_channels_command') {
       try {
@@ -228,11 +232,11 @@ bot.onText(/\/start/, (msg) => {
         return;
       }
     }
-  
+
     const updateMessage = (text, keyboard, msg) => {
       const isContentDifferent = msg.text !== text;
       const isKeyboardDifferent = JSON.stringify(msg.reply_markup) !== JSON.stringify(keyboard);
-  
+
       if (isContentDifferent || isKeyboardDifferent) {
         bot.editMessageText(text, {
           chat_id: msg.chat.id,
@@ -344,7 +348,6 @@ bot.onText(/\/start/, (msg) => {
           **  قنوات  التنبيهات 🔔 :  
 اختر قناة المنتجات التي ترغب بها
 
-
 واستمتع باسرع اشعارات لمنتجاتك المخصصة:**`;
           await bot.sendMessage(chatId, fullResponse, {
             reply_markup: notificationChannelsKeyboard,
@@ -362,7 +365,7 @@ bot.onText(/\/start/, (msg) => {
   });
 });
 
-
+// الحصول على حالة الاشتراك
 async function getSubscriptionStatus(userId, callback) {
   let connection;
   try {
@@ -384,6 +387,7 @@ async function getSubscriptionStatus(userId, callback) {
   }
 }
 
+// تفعيل الاشتراك
 async function activateSubscription(userId, code, callback) {
   let connection;
   try {
@@ -403,6 +407,7 @@ async function activateSubscription(userId, code, callback) {
   }
 }
 
+// التعامل مع التجربة المجانية
 async function handleFreeTrial(userId, callback) {
   let connection;
   try {
@@ -446,6 +451,7 @@ async function handleFreeTrial(userId, callback) {
   }
 }
 
+// تفعيل التجربة المجانية
 async function activateFreeTrial(userId, connection) {
   const startDate = new Date().toISOString().split('T')[0];
   let expiryDate = new Date();
