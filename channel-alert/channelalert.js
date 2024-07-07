@@ -65,8 +65,8 @@ async function checkProductAvailability(url) {
     
     if (productNames[url]) {
       const productNameAr = productNames[url].ar;
-      const imageUrlAvailable = path.join(__dirname, '..', 'images', `${productNames[url].en}.png`);
-      const imageUrlUnavailable = path.join(__dirname, '..', 'images', `${productNames[url].en}-outofstock.png`);
+      const imageUrlAvailable = path.join(__dirname, 'images', `${productNames[url].en}.png`);
+      const imageUrlUnavailable = path.join(__dirname, 'images', `${productNames[url].en}.png`);
 
       if (!isUnavailable && (currentTime - productStatus[url].individualCooldownTime > productCooldown)) {
         // المنتج متوفر الآن وفترة التهدئة الفردية قد انقضت
