@@ -17,9 +17,6 @@ const productNames = {
   'https://www.dzrt.com/ar/mint-fusion.html': { ar: 'منت فيوجن', en: 'mint-fusion' },
   'https://www.dzrt.com/ar/haila.html': { ar: ' هيلة', en: 'haila' },
   'https://www.dzrt.com/ar/samra.html': { ar: 'سمرة ', en: 'samra' },
-  'https://www.dzrt.com/ar/purple-mist.html': { ar: 'بيربل مست', en: 'purple-mist' },
-
-
 };
 const urls = [
   'https://www.dzrt.com/ar/icy-rush.html',
@@ -29,7 +26,6 @@ const urls = [
   'https://www.dzrt.com/ar/mint-fusion.html',
   'https://www.dzrt.com/ar/haila.html',
   'https://www.dzrt.com/ar/samra.html',
-  'https://www.dzrt.com/ar/purple-mist.html',
 
 ];
 
