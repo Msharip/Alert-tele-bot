@@ -187,15 +187,17 @@ const supportAndBackKeyboard = {
 bot.onText(/\/start/, async (msg) => {
   const chatId = msg.chat.id;
   const userId = msg.from.id;
+
+  // التحقق من نوع الرسالة لاستثناء زر الرجوع
+  if (msg.text !== '/start') {
+    return;
+  }
+
   // التحقق من النقر المتتالي السريع للأمر /start
   try {
     await rateLimiter.consume(userId.toString());
   } catch (rateLimiterRes) {
     bot.sendMessage(chatId, '⚠️\t   تجنب ارسال امر - /start - متكرر \n\n  سيتم حظرك فورا اذا تم تكرار ذلك 2 من المرات     \n\n  ');
-    // تحديد مدة الحظر
-    setTimeout(() => {
-      rateLimiter.delete(userId.toString());
-    }, rateLimiter.blockDuration * 1000);
     return;
   }
     userClicks.set(userId, 0);
