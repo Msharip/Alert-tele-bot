@@ -197,7 +197,7 @@ bot.onText(/\/start/, async (msg) => {
   const timeLimit = 20000;
 
   if (currentTime - lastStartTime < timeLimit) {
-    bot.sendMessage(chatId, '⚠️  تجنب ارسال امر - /start - متكرر\n\n سيتم حظرك فورا اذا تم تكرار ذلك 2 من المرات');
+    bot.sendMessage(chatId, '⚠️  تجنب ارسال امر - /start - متكرر\n\n سيتم حظرك فورا اذا تم تكرار ذلك 2 من المرات \n\n تم ايقاف الامر موقتا');
     return;
   }
 
