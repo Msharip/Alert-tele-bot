@@ -182,16 +182,10 @@ const supportAndBackKeyboard = {
     ]
   ]
 };
-
 // استقبال أوامر المستخدم
 bot.onText(/\/start/, async (msg) => {
   const chatId = msg.chat.id;
   const userId = msg.from.id;
-
-  // التحقق من نوع الرسالة لاستثناء زر الرجوع
-  if (msg.text !== '/start') {
-    return;
-  }
 
   // التحقق من النقر المتتالي السريع للأمر /start
   try {
@@ -200,7 +194,7 @@ bot.onText(/\/start/, async (msg) => {
     bot.sendMessage(chatId, '⚠️\t   تجنب ارسال امر - /start - متكرر \n\n  سيتم حظرك فورا اذا تم تكرار ذلك 2 من المرات     \n\n  ');
     return;
   }
-    userClicks.set(userId, 0);
+  userClicks.set(userId, 0);
 
   const isSubscribed = await isUserSubscribed(userId);
 
@@ -259,15 +253,28 @@ bot.onText(/\/start/, async (msg) => {
         bot.answerCallbackQuery(callbackQuery.id, {
           text: '⚠️\n\nتجنب النقر المتتالي على الأزرار \n\n تم إيقاف البوت لمدة قصيرة',
           show_alert: true
-        });    // تحديد مدة الحظر
+        });
+
+        // تحديد مدة الحظر
+        const blockDuration = rateLimiter.blockDuration * 1000;
         setTimeout(() => {
-          rateLimiter.delete(userId.toString());
-        }, rateLimiter.blockDuration * 1000);
+          rateLimiter.delete(callbackUserId.toString());
+        }, blockDuration);
+
         return;
       }
-    }
-
-    const updateMessage = (text, keyboard, msg) => {
+    }    switch (data) {
+      case 'notification_channels_command':
+        break;
+      case 'activate_subscription_command':
+        break;
+      case 'free_trial_command':
+        break;
+      case 'subscription_status_command':
+        break;
+      default:
+        break;
+    } const updateMessage = (text, keyboard, msg) => {
       const isContentDifferent = msg.text !== text;
       const isKeyboardDifferent = JSON.stringify(msg.reply_markup) !== JSON.stringify(keyboard);
 
