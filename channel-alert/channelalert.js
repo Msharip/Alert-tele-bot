@@ -48,7 +48,7 @@ const channels = {
 const mainChannelId = process.env.CHAT_ID_MAIN;
 const token = process.env.TOKEN3;
 const bot = new TelegramBot(token, { polling: true });
-const productCooldown = 20 * 60 * 1000; // فترة التهدئة الفردية (10 دقائق)
+const productCooldown = 30 * 60 * 1000; // فترة التهدئة الفردية (30 دقائق)
 
 const productStatus = {};
 
@@ -131,7 +131,7 @@ async function checkProductAvailability(url) {
             productStatus[url].individualCooldownTime = 0;
             productStatus[url].isAvailable = false;
           }
-        }, 15000);
+        }, 5000);
       }
     }
   } catch (error) {
@@ -146,7 +146,7 @@ async function checkAllUrls() {
   }
 }
 
-cron.schedule('* * * * *', () => {
+cron.schedule('* * * * * *', () => {
   const now = new Date();
   const hour = now.getHours();
 
@@ -154,8 +154,6 @@ cron.schedule('* * * * *', () => {
     checkAllUrls();
   }
 });
-
-
 
 
 const dbConfig = {

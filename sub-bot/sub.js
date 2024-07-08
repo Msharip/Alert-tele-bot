@@ -23,8 +23,8 @@ const userClicks = new Map();
 
 const rateLimiter = new rateLimit.RateLimiterMemory({
   points: 1, // عدد النقاط المتاحة لكل فترة
-  duration: 2.5, // المدة بالثواني لكل نقطة
-  blockDuration: 1, // مدة الحظر بالثواني إذا تم تجاوز عدد النقاط المسموح بها
+  duration: 5, // المدة بالثواني لكل نقطة
+  blockDuration: 2, // مدة الحظر بالثواني إذا تم تجاوز عدد النقاط المسموح بها
 });
 
 // تفعيل اشتراك المستخدم
@@ -116,6 +116,7 @@ async function extendUserSubscription(connection, userId, code, duration, callba
     callback('⚠️ حدث خطأ أثناء تمديد الاشتراك.');
   }
 }
+
 // حذف كود التفعيل
 async function deleteActivationCode(connection, code) {
   const deleteQuery = 'DELETE FROM activationcodes WHERE activation_code = ?';
@@ -186,7 +187,18 @@ const supportAndBackKeyboard = {
 bot.onText(/\/start/, async (msg) => {
   const chatId = msg.chat.id;
   const userId = msg.from.id;
-  userClicks.set(userId, 0);
+  // التحقق من النقر المتتالي السريع للأمر /start
+  try {
+    await rateLimiter.consume(userId.toString());
+  } catch (rateLimiterRes) {
+    bot.sendMessage(chatId, '⚠️\t   تجنب ارسال امر - /start - متكرر \n\n  سيتم حظرك فورا اذا تم تكرار ذلك 2 من المرات     \n\n  ');
+    // تحديد مدة الحظر
+    setTimeout(() => {
+      rateLimiter.delete(userId.toString());
+    }, rateLimiter.blockDuration * 1000);
+    return;
+  }
+    userClicks.set(userId, 0);
 
   const isSubscribed = await isUserSubscribed(userId);
 
@@ -238,14 +250,17 @@ bot.onText(/\/start/, async (msg) => {
     if (callbackUserId !== userId) return;
 
     // التحقق من النقر المتتالي السريع باستثناء أوامر معينة
-    if (data !== 'start' && data !== 'notification_channels_command') {
+    if (data !== 'start' && data !== 'free_trial_command') {
       try {
         await rateLimiter.consume(callbackUserId.toString());
       } catch (rateLimiterRes) {
         bot.answerCallbackQuery(callbackQuery.id, {
           text: '⚠️\n\nتجنب النقر المتتالي على الأزرار \n\n تم إيقاف البوت لمدة قصيرة',
           show_alert: true
-        });
+        });    // تحديد مدة الحظر
+        setTimeout(() => {
+          rateLimiter.delete(userId.toString());
+        }, rateLimiter.blockDuration * 1000);
         return;
       }
     }
@@ -364,6 +379,7 @@ bot.onText(/\/start/, async (msg) => {
         }
       });
     } else if (data === 'start') {
+      activeUsers.delete(userId);
       updateMessage(welcomeMessage, mainKeyboard, msg);
     }
   });
@@ -382,8 +398,7 @@ bot.onText(/\/start/, async (msg) => {
 
         if (!res.includes('⚠️')) {
           const fullResponse = `
-          **  قنوات  التنبيهات 🔔 :  
-اختر قناة المنتجات التي ترغب بها
+اختر قناة المنتجات التي ترغب بها🔔
 
 واستمتع باسرع اشعارات لمنتجاتك المخصصة:**`;
           await bot.sendMessage(chatId, fullResponse, {
@@ -449,38 +464,47 @@ async function handleFreeTrial(userId, callback) {
   let connection;
   try {
     connection = await pool.getConnection();
+    await connection.beginTransaction();
+
     const [results] = await connection.execute('SELECT trial_used, activated FROM users WHERE id = ?', [userId]);
 
     if (results.length > 0) {
       const user = results[0];
-      const [trialCountResult] = await connection.execute('SELECT count FROM trial_usage WHERE id = 1');
+      const [trialCountResult] = await connection.execute('SELECT count FROM trial_usage WHERE id = 1 FOR UPDATE');
       const trialCount = trialCountResult[0].count;
 
       if (user.trial_used) {
+        await connection.rollback();
         callback('لقد استخدمت التجربة المجانية مسبقًا ⚠️.\n\nبامكانك الاشتراك من هنا:\n[رابط المتجر] او الضغط على زر المتجر👇🏻\n\n https://www.dzrt.com/ar/our-products.html', false);
       } else if (user.activated) {
+        await connection.rollback();
         callback('لديك اشتراك نشط حاليًا ⚠️.', false);
       } else if (trialCount >= 20) {
+        await connection.rollback();
         callback('لقد تم استخدام جميع الاشتراكات التجريبية المجانية لهذا اليوم ⚠️.', false);
       } else {
         await activateFreeTrial(userId, connection);
         await connection.execute('UPDATE trial_usage SET count = count + 1 WHERE id = 1');
+        await connection.commit();
         console.log('Trial count after update:', trialCount + 1);
-        callback('تم تفعيل الاشتراك التجريبي المجاني ليوم واحد بنجاح 🎉 \n\n  قم بالضغط على قنوات التنبيهات وانضم الى ماترغب به', true);
+        callback('تم تفعيل الاشتراك التجريبي المجاني \n ليوم واحد  🎉 \n\n\n\n اختر مالقنوات التي تريد الانضمام لها ', true);
       }
     } else {
-      const [trialCountResult] = await connection.execute('SELECT count FROM trial_usage WHERE id = 1');
+      const [trialCountResult] = await connection.execute('SELECT count FROM trial_usage WHERE id = 1 FOR UPDATE');
       const trialCount = trialCountResult[0].count;
 
       if (trialCount >= 20) {
+        await connection.rollback();
         callback('لقد تم استخدام جميع الاشتراكات التجريبية المجانية لهذا اليوم ⚠️.\n\n يوميا الساعه 12 ظهرا سيتم اعادة تعيين التجربة الى اول 20 شخص', false);
       } else {
         await activateFreeTrial(userId, connection);
         await connection.execute('UPDATE trial_usage SET count = count + 1 WHERE id = 1');
-        callback('تم تفعيل الاشتراك التجريبي المجاني ليوم واحد بنجاح 🎉 \n\n قم بالضغط على قنوات التنبيهات وانضم الى ماترغب به', true);
+        await connection.commit();
+        callback('تم تفعيل الاشتراك التجريبي المجاني \n ليوم واحد  🎉 \n\n\n\n اختر مالقنوات التي تريد الانضمام لها ', true);
       }
     }
   } catch (err) {
+    if (connection) await connection.rollback();
     console.error('Error handling free trial:', err);
     callback('⚠️ حدث خطأ أثناء تفعيل الاشتراك التجريبي.', false);
   } finally {
@@ -502,8 +526,6 @@ async function activateFreeTrial(userId, connection) {
   await connection.execute(insertOrUpdateQuery, [userId, true, '1 يوم', startDate, expiryDate.toISOString().split('T')[0], true]);
 }
 
-
-
 // جدولة إعادة تعيين العداد عند الساعة 12 ظهرًا
 cron.schedule('0 12 * * *', async () => {
   let connection;
@@ -516,3 +538,4 @@ cron.schedule('0 12 * * *', async () => {
     if (connection) connection.release();
   }
 });
+
