@@ -24,7 +24,7 @@ const userClicks = new Map();
 const rateLimiter = new rateLimit.RateLimiterMemory({
   points: 1, // عدد النقاط المتاحة لكل فترة
   duration: 2, // المدة بالثواني لكل نقطة
-  blockDuration: 10, // مدة الحظر بالثواني إذا تم تجاوز عدد النقاط المسموح بها
+  blockDuration: 2, // مدة الحظر بالثواني إذا تم تجاوز عدد النقاط المسموح بها
 });
 
 // تفعيل اشتراك المستخدم
@@ -263,7 +263,9 @@ bot.onText(/\/start/, async (msg) => {
 
         return;
       }
-    }    switch (data) {
+    }
+
+    switch (data) {
       case 'notification_channels_command':
         break;
       case 'activate_subscription_command':
