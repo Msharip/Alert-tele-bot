@@ -3,6 +3,7 @@ const app = express();
 
 
 require('./channel-alert/channelalert.js');
+require('./tele/telexboxv.js');
 require('./sub-bot/sub.js');
 
 

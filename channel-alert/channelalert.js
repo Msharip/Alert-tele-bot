@@ -65,8 +65,10 @@ async function checkProductAvailability(url) {
     
     if (productNames[url]) {
       const productNameAr = productNames[url].ar;
-      const imageUrlAvailable = path.join(__dirname, 'images', `${productNames[url].en}.png`);
-      const imageUrlUnavailable = path.join(__dirname, 'images', `${productNames[url].en}.png`);
+      //      const imageUrlAvailable = path.join(__dirname, 'images', `${productNames[url].en}.png`);
+   //  const imageUrlUnavailable = path.join(__dirname, 'images', `${productNames[url].en}-outofstock.png`);
+   const imageUrlAvailable = path.join(__dirname, '..', 'images', `${productNames[url].en}.png`);
+   const imageUrlUnavailable = path.join(__dirname, '..', 'images', `${productNames[url].en}-outofstock.png`);
 
       if (!isUnavailable && (currentTime - productStatus[url].individualCooldownTime > productCooldown)) {
         // المنتج متوفر الآن وفترة التهدئة الفردية قد انقضت
@@ -144,9 +146,13 @@ async function checkAllUrls() {
     }
   }
 }
-// جدولة الفحص ليعمل كل ثانية
 cron.schedule('* * * * * *', () => {
-  checkAllUrls();
+  const now = new Date();
+  const hour = now.getHours();
+
+  if (hour >= 13 && hour <= 21) {
+    checkAllUrls();
+  }
 });
 
 
