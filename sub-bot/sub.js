@@ -3,7 +3,6 @@ const mysql = require('mysql2/promise');
 const cron = require('node-cron');
 const rateLimit = require('rate-limiter-flexible');
 require('dotenv').config();
-
 // إعدادات قاعدة البيانات
 const dbConfig = {
   host: process.env.DB_HOST,
@@ -20,11 +19,12 @@ const pool = mysql.createPool(dbConfig);
 
 const activeUsers = new Map();
 const userClicks = new Map();
+const rateLimitMap = new Map(); // لتتبع آخر وقت تلقى فيه المستخدم أمر /start
 
 const rateLimiter = new rateLimit.RateLimiterMemory({
   points: 1, // عدد النقاط المتاحة لكل فترة
   duration: 2, // المدة بالثواني لكل نقطة
-  blockDuration: 2, // مدة الحظر بالثواني إذا تم تجاوز عدد النقاط المسموح بها
+  blockDuration: 15, // مدة الحظر بالثواني إذا تم تجاوز عدد النقاط المسموح بها
 });
 
 // تفعيل اشتراك المستخدم
@@ -35,6 +35,7 @@ async function activateUserSubscription(userId, code, duration, callback) {
     await connection.beginTransaction();
 
     const [existingUsers] = await connection.execute('SELECT * FROM users WHERE id = ?', [userId]);
+  
     const user = existingUsers.length > 0 ? existingUsers[0] : null;
 
     if (user) {
@@ -182,18 +183,26 @@ const supportAndBackKeyboard = {
     ]
   ]
 };
-// استقبال أوامر المستخدم
+
+
+
 bot.onText(/\/start/, async (msg) => {
   const chatId = msg.chat.id;
   const userId = msg.from.id;
+  
+  const currentTime = new Date().getTime();
+  const lastStartTime = rateLimitMap.get(userId) || 0;
 
-  // التحقق من النقر المتتالي السريع للأمر /start
-  try {
-    await rateLimiter.consume(userId.toString());
-  } catch (rateLimiterRes) {
-    bot.sendMessage(chatId, '⚠️\t   تجنب ارسال امر - /start - متكرر \n\n  سيتم حظرك فورا اذا تم تكرار ذلك 2 من المرات     \n\n  ');
+  // تحديد فترة السماح بالمللي ثانية (مثلاً 10 ثواني)
+  const timeLimit = 20000;
+
+  if (currentTime - lastStartTime < timeLimit) {
+    bot.sendMessage(chatId, '⚠️  تجنب ارسال امر - /start - متكرر\n\n سيتم حظرك فورا اذا تم تكرار ذلك 2 من المرات');
     return;
   }
+
+  // تحديث آخر وقت تلقى فيه المستخدم أمر /start
+  rateLimitMap.set(userId, currentTime);
   userClicks.set(userId, 0);
 
   const isSubscribed = await isUserSubscribed(userId);
@@ -203,7 +212,6 @@ bot.onText(/\/start/, async (msg) => {
       isSubscribed ? [
         { text: 'قنوات التنبيهات 🔔', callback_data: 'notification_channels_command' },
         { text: 'تفعيل الاشتراك 🔑', callback_data: 'activate_subscription_command' }
-
       ] : [
         { text: 'تجربة مجانية 🎁', callback_data: 'free_trial_command' },
         { text: 'تفعيل الاشتراك 🔑', callback_data: 'activate_subscription_command' }
@@ -244,7 +252,7 @@ bot.onText(/\/start/, async (msg) => {
     const data = callbackQuery.data;
     const callbackUserId = callbackQuery.from.id;
     if (callbackUserId !== userId) return;
-
+    
     // التحقق من النقر المتتالي السريع باستثناء أوامر معينة
     if (data !== 'start' && data !== 'free_trial_command') {
       try {
@@ -253,30 +261,12 @@ bot.onText(/\/start/, async (msg) => {
         bot.answerCallbackQuery(callbackQuery.id, {
           text: '⚠️\n\nتجنب النقر المتتالي على الأزرار \n\n تم إيقاف البوت لمدة قصيرة',
           show_alert: true
-        });
-
-        // تحديد مدة الحظر
-        const blockDuration = rateLimiter.blockDuration * 1000;
-        setTimeout(() => {
-          rateLimiter.delete(callbackUserId.toString());
-        }, blockDuration);
-
+        }); 
         return;
       }
     }
-
-    switch (data) {
-      case 'notification_channels_command':
-        break;
-      case 'activate_subscription_command':
-        break;
-      case 'free_trial_command':
-        break;
-      case 'subscription_status_command':
-        break;
-      default:
-        break;
-    } const updateMessage = (text, keyboard, msg) => {
+    
+    const updateMessage = (text, keyboard, msg) => {
       const isContentDifferent = msg.text !== text;
       const isKeyboardDifferent = JSON.stringify(msg.reply_markup) !== JSON.stringify(keyboard);
 
@@ -410,7 +400,7 @@ bot.onText(/\/start/, async (msg) => {
         if (!res.includes('⚠️')) {
           const fullResponse = `
 اختر قناة المنتجات التي ترغب بها🔔
-
+\n\n\n
 واستمتع باسرع اشعارات لمنتجاتك المخصصة:**`;
           await bot.sendMessage(chatId, fullResponse, {
             reply_markup: notificationChannelsKeyboard,
@@ -502,6 +492,7 @@ async function handleFreeTrial(userId, callback) {
       }
     } else {
       const [trialCountResult] = await connection.execute('SELECT count FROM trial_usage WHERE id = 1 FOR UPDATE');
+
       const trialCount = trialCountResult[0].count;
 
       if (trialCount >= 20) {
