@@ -2,8 +2,10 @@ const axios = require('axios');
 const cheerio = require('cheerio');
 const TelegramBot = require('node-telegram-bot-api');
 const cron = require('node-cron');
+const express = require('express');
 const { TwitterApi } = require('twitter-api-v2');
 const path = require('path');
+const app = express();
 
 const productNames = {
 
@@ -15,6 +17,8 @@ const productNames = {
   'https://www.dzrt.com/ar/mint-fusion.html': { ar: 'منت فيوجن', en: 'mint-fusion' },
   'https://www.dzrt.com/ar/haila.html': { ar: ' هيلة', en: 'haila' },
   'https://www.dzrt.com/ar/samra.html': { ar: 'سمرة ', en: 'samra' },
+  'https://www.dzrt.com/ar/purple-mist.html': { ar: 'بيربل مست', en: 'purple-mist' },
+
 
 };
 const urls = [
@@ -24,7 +28,9 @@ const urls = [
   'https://www.dzrt.com/ar/garden-mint.html',
   'https://www.dzrt.com/ar/mint-fusion.html',
   'https://www.dzrt.com/ar/haila.html',
-  'https://www.dzrt.com/ar/samra.html'
+  'https://www.dzrt.com/ar/samra.html',
+  'https://www.dzrt.com/ar/purple-mist.html',
+
 ];
 
 const token = '6749756089:AAFMCjy0-85EkyQIrzC4tJU5jIyFJvpnLEI';
@@ -53,12 +59,11 @@ async function checkProductAvailability(url) {
     
     if (productNames[url]) {
       const productNameAr = productNames[url].ar;
-      const imageUrl = path.join(__dirname, 'images', `${productNames[url].en}.png`);
+      const imageUrl = path.join(__dirname, '..', 'images', `${productNames[url].en}.png`);
 
       if (!isUnavailable && (currentTime - productStatus[url].individualCooldownTime > productCooldown)) {
         // المنتج متوفر الآن وفترة التهدئة الفردية قد انقضت
         const message = `*${productNameAr}* - متوفر الآن ✅ \n[ أضغط هنا ](${url})`;
-        console.log(message);
         const sentMessage = await bot.sendPhoto(chatId, imageUrl, { caption: message, parse_mode: 'Markdown' });
         
         productStatus[url] = {
@@ -92,8 +97,11 @@ async function checkAllUrls() {
   }
 }
 
-// جدولة الفحص ليعمل كل ثانية
 cron.schedule('* * * * * *', () => {
-  checkAllUrls();
-});
+  const now = new Date();
+  const hour = now.getHours();
 
+  if (hour >= 13 && hour <= 21) {
+    checkAllUrls();
+  }
+});

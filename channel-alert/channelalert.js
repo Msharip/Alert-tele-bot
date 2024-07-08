@@ -48,12 +48,18 @@ const channels = {
 const mainChannelId = process.env.CHAT_ID_MAIN;
 const token = process.env.TOKEN3;
 const bot = new TelegramBot(token, { polling: true });
+const productCooldown = 20 * 60 * 1000; // فترة التهدئة الفردية (10 دقائق)
 
-const productCooldown = 20 * 60 * 1000; // فترة التهدئة لكل منتج على حدة: 20 دقائق بالمللي ثانية
+const productStatus = {};
 
-let productStatus = {};
 urls.forEach(url => {
-  productStatus[url] = { isAvailable: false, lastNotificationTime: 0, isNotifying: false, isOutOfStockNotified: false, individualCooldownTime: 0 };
+  productStatus[url] = {
+    isAvailable: false,
+    lastNotificationTime: 0,
+    isNotifying: false,
+    isOutOfStockNotified: false,
+    individualCooldownTime: 0
+  };
 });
 
 async function checkProductAvailability(url) {
@@ -65,13 +71,10 @@ async function checkProductAvailability(url) {
     
     if (productNames[url]) {
       const productNameAr = productNames[url].ar;
-      //      const imageUrlAvailable = path.join(__dirname, 'images', `${productNames[url].en}.png`);
-   //  const imageUrlUnavailable = path.join(__dirname, 'images', `${productNames[url].en}-outofstock.png`);
-   const imageUrlAvailable = path.join(__dirname, '..', 'images', `${productNames[url].en}.png`);
-   const imageUrlUnavailable = path.join(__dirname, '..', 'images', `${productNames[url].en}-outofstock.png`);
+      const imageUrlAvailable = path.join(__dirname, '..', 'images', `${productNames[url].en}.png`);
+      const imageUrlUnavailable = path.join(__dirname, '..', 'images', `${productNames[url].en}-outofstock.png`);
 
       if (!isUnavailable && (currentTime - productStatus[url].individualCooldownTime > productCooldown)) {
-        // المنتج متوفر الآن وفترة التهدئة الفردية قد انقضت
         const message = `*${productNameAr}* - متوفر الآن ✅`;
         console.log(`*${productNameAr}* - متوفر الآن ✅`);
         
@@ -87,14 +90,12 @@ async function checkProductAvailability(url) {
           ]
         };
 
-        // إرسال الإشعار للقناة الرئيسية
         await bot.sendPhoto(mainChannelId, imageUrlAvailable, {
           caption: message,
           parse_mode: 'Markdown',
           reply_markup: JSON.stringify(replyMarkup)
         });
 
-        // إرسال الإشعار للقناة الخاصة بالمنتج
         await bot.sendPhoto(channels[url].chatId, imageUrlAvailable, {
           caption: message,
           parse_mode: 'Markdown',
@@ -104,17 +105,15 @@ async function checkProductAvailability(url) {
         productStatus[url] = {
           isAvailable: true,
           lastNotificationTime: currentTime,
-          isNotifying: true, // تعيين المنتج كقيد الإشعار لمنع تكرار الإشعارات
-          isOutOfStockNotified: false, // إعادة تعيين إشعار نفاد المخزون
-          individualCooldownTime: currentTime // تعيين وقت التهدئة الفردية
+          isNotifying: true,
+          isOutOfStockNotified: false,
+          individualCooldownTime: currentTime
         };
 
-        // تعيين مؤقت لإعادة تمكين الفحص بعد 10 دقائق
         setTimeout(() => {
           productStatus[url].isNotifying = false;
         }, productCooldown);
-      } else if (isUnavailable && productStatus[url].isAvailable) {
-        // المنتج غير متوفر الآن ولكنه كان متوفرًا في الفحص السابق
+      } else if (isUnavailable && productStatus[url].isAvailable && !productStatus[url].isOutOfStockNotified) {
         setTimeout(async () => {
           const { data: newData } = await axios.get(url);
           const new$ = cheerio.load(newData);
@@ -128,11 +127,11 @@ async function checkProductAvailability(url) {
               parse_mode: 'Markdown'
             });
 
-            productStatus[url].isOutOfStockNotified = true; // تعيين العلم لمنع تكرار الإشعارات
-            productStatus[url].individualCooldownTime = 0; // إعادة تعيين فترة التهدئة الفردية
+            productStatus[url].isOutOfStockNotified = true;
+            productStatus[url].individualCooldownTime = 0;
             productStatus[url].isAvailable = false;
           }
-        }, 15000); // الانتظار لمدة 15 ثانية قبل إرسال إشعار نفاد المنتج
+        }, 15000);
       }
     }
   } catch (error) {
@@ -146,7 +145,8 @@ async function checkAllUrls() {
     }
   }
 }
-cron.schedule('* * * * * *', () => {
+
+cron.schedule('* * * * *', () => {
   const now = new Date();
   const hour = now.getHours();
 

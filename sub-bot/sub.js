@@ -193,7 +193,9 @@ bot.onText(/\/start/, async (msg) => {
   const mainKeyboard = {
     inline_keyboard: [
       isSubscribed ? [
-        { text: 'قنوات التنبيهات 🔔', callback_data: 'notification_channels_command' }
+        { text: 'قنوات التنبيهات 🔔', callback_data: 'notification_channels_command' },
+        { text: 'تفعيل الاشتراك 🔑', callback_data: 'activate_subscription_command' }
+
       ] : [
         { text: 'تجربة مجانية 🎁', callback_data: 'free_trial_command' },
         { text: 'تفعيل الاشتراك 🔑', callback_data: 'activate_subscription_command' }
