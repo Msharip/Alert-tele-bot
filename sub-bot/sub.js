@@ -24,7 +24,7 @@ const rateLimitMap = new Map(); // لتتبع آخر وقت تلقى فيه ال
 const rateLimiter = new rateLimit.RateLimiterMemory({
   points: 2, // عدد النقاط المتاحة لكل فترة
   duration: 2, // المدة بالثواني لكل نقطة
-  blockDuration: 15, // مدة الحظر بالثواني إذا تم تجاوز عدد النقاط المسموح بها
+  blockDuration: 2, // مدة الحظر بالثواني إذا تم تجاوز عدد النقاط المسموح بها
 });
 
 // تفعيل اشتراك المستخدم
@@ -138,8 +138,6 @@ async function isUserSubscribed(userId) {
     if (connection) connection.release();
   }
 }
-
-// لوحة مفاتيح قنوات التنبيهات
 const notificationChannelsKeyboard = {
   inline_keyboard: [
     [
@@ -171,7 +169,6 @@ const notificationChannelsKeyboard = {
   ]
 };
 
-// لوحة مفاتيح المساعدة والعودة
 const supportAndBackKeyboard = {
   inline_keyboard: [
     [
@@ -184,7 +181,8 @@ const supportAndBackKeyboard = {
   ]
 };
 
-
+// تخزين معرفات الرسائل في خريطة
+const userMessagesMap = new Map();
 
 bot.onText(/\/start/, async (msg) => {
   const chatId = msg.chat.id;
@@ -193,17 +191,28 @@ bot.onText(/\/start/, async (msg) => {
   const currentTime = new Date().getTime();
   const lastStartTime = rateLimitMap.get(userId) || 0;
 
-  // تحديد فترة السماح بالمللي ثانية (مثلاً 10 ثواني)
+  // تحديد فترة السماح بالمللي ثانية (مثلاً 20 ثواني)
   const timeLimit = 20000;
 
   if (currentTime - lastStartTime < timeLimit) {
-    bot.sendMessage(chatId, '⚠️  تجنب ارسال امر - /start - متكرر\n\n سيتم حظرك فورا اذا تم تكرار ذلك 2 من المرات \n\n تم ايقاف الامر موقتا');
+    bot.sendMessage(chatId, '⚠️  تجنب ارسال امر - /start - متكرر\n\n سيتم حظرك فورا اذا تم تكرار ذلك 2 من المرات \n\n تم ايقاف الامر موقتا لمده من الوقت');
     return;
   }
 
   // تحديث آخر وقت تلقى فيه المستخدم أمر /start
   rateLimitMap.set(userId, currentTime);
   userClicks.set(userId, 0);
+
+  // حذف الرسائل السابقة
+  if (userMessagesMap.has(userId)) {
+    const previousMessages = userMessagesMap.get(userId);
+    previousMessages.forEach(messageId => {
+      bot.deleteMessage(chatId, messageId).catch((error) => {
+        console.error('Error deleting previous message:', error);
+      });
+    });
+    userMessagesMap.delete(userId);
+  }
 
   const isSubscribed = await isUserSubscribed(userId);
 
@@ -245,6 +254,8 @@ bot.onText(/\/start/, async (msg) => {
   bot.sendMessage(chatId, welcomeMessage, {
     reply_markup: mainKeyboard,
     parse_mode: 'Markdown'
+  }).then((sentMessage) => {
+    userMessagesMap.set(userId, [sentMessage.message_id]);
   });
 
   bot.on('callback_query', async (callbackQuery) => {
@@ -460,9 +471,7 @@ async function activateSubscription(userId, code, callback) {
   }
 }
 
-
 // التعامل مع التجربة المجانية
-
 async function handleFreeTrial(userId, callback) {
   let connection;
   try {
