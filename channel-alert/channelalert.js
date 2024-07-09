@@ -48,7 +48,8 @@ const channels = {
 const mainChannelId = process.env.CHAT_ID_MAIN;
 const token = process.env.TOKEN3;
 const bot = new TelegramBot(token, { polling: true });
-const productCooldown = 30 * 60 * 1000; // فترة التهدئة الفردية (30 دقائق)
+
+const productCooldown = 15 * 60 * 1000; // فترة التهدئة الفردية (15 دقائق)
 
 const productStatus = {};
 
@@ -74,6 +75,7 @@ async function checkProductAvailability(url) {
       const imageUrlAvailable = path.join(__dirname, '..', 'images', `${productNames[url].en}.png`);
       const imageUrlUnavailable = path.join(__dirname, '..', 'images', `${productNames[url].en}-outofstock.png`);
 
+      // عند توفر المنتج
       if (!isUnavailable && (currentTime - productStatus[url].individualCooldownTime > productCooldown)) {
         const message = `*${productNameAr}* - متوفر الآن ✅`;
         console.log(`*${productNameAr}* - متوفر الآن ✅`);
@@ -102,36 +104,30 @@ async function checkProductAvailability(url) {
           reply_markup: JSON.stringify(replyMarkup)
         });
 
+        // إعادة تعيين فترة التهدئة عند توفر المنتج
         productStatus[url] = {
           isAvailable: true,
           lastNotificationTime: currentTime,
           isNotifying: true,
           isOutOfStockNotified: false,
-          individualCooldownTime: currentTime
+          individualCooldownTime: currentTime // إعادة تعيين إلى الوقت الحالي
         };
 
         setTimeout(() => {
           productStatus[url].isNotifying = false;
         }, productCooldown);
+      // عند نفاد المنتج
       } else if (isUnavailable && productStatus[url].isAvailable && !productStatus[url].isOutOfStockNotified) {
-        setTimeout(async () => {
-          const { data: newData } = await axios.get(url);
-          const new$ = cheerio.load(newData);
-          const stillUnavailable = new$('div.stock.unavailable span').length > 0;
-          
-          if (stillUnavailable) {
-            const message = `*${productNameAr}* - نفد من المخزون ❌`;
-            
-            await bot.sendPhoto(channels[url].chatId, imageUrlUnavailable, {
-              caption: message,
-              parse_mode: 'Markdown'
-            });
+        const message = `*${productNameAr}* - نفذ من المخزون ❌`;
+        await bot.sendPhoto(channels[url].chatId, imageUrlUnavailable, {
+          caption: message,
+          parse_mode: 'Markdown'
+        });
 
-            productStatus[url].isOutOfStockNotified = true;
-            productStatus[url].individualCooldownTime = 0;
-            productStatus[url].isAvailable = false;
-          }
-        }, 5000);
+        // إعادة تعيين فترة التهدئة عند نفاد المنتج
+        productStatus[url].isOutOfStockNotified = true;
+        productStatus[url].individualCooldownTime = 0; // تعيين إلى 0 يعني إعادة تعيين فترة التهدئة
+        productStatus[url].isAvailable = false;
       }
     }
   } catch (error) {
@@ -150,7 +146,7 @@ cron.schedule('* * * * * *', () => {
   const now = new Date();
   const hour = now.getHours();
 
-  if (hour >= 13 && hour <= 21) {
+  if (hour >= 13 && hour <= 22) {
     checkAllUrls();
   }
 });
@@ -194,8 +190,6 @@ async function checkUserSubscriptions() {
       try {
         await unbanUserFromAllChannels(user.id, channelIds);
         await deactivateUserSubscription(user.id);
-
-        console.log(`User ${user.id} subscription has been deactivated.`);
       } catch (error) {
         console.error(`Failed to process user ${user.id}:`, error);
       }

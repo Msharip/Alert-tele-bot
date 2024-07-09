@@ -22,7 +22,7 @@ const userClicks = new Map();
 const rateLimitMap = new Map(); // لتتبع آخر وقت تلقى فيه المستخدم أمر /start
 
 const rateLimiter = new rateLimit.RateLimiterMemory({
-  points: 1, // عدد النقاط المتاحة لكل فترة
+  points: 2, // عدد النقاط المتاحة لكل فترة
   duration: 2, // المدة بالثواني لكل نقطة
   blockDuration: 15, // مدة الحظر بالثواني إذا تم تجاوز عدد النقاط المسموح بها
 });
@@ -254,7 +254,7 @@ bot.onText(/\/start/, async (msg) => {
     if (callbackUserId !== userId) return;
     
     // التحقق من النقر المتتالي السريع باستثناء أوامر معينة
-    if (data !== 'start' && data !== 'free_trial_command') {
+    if (data !== 'start' && data !== 'notification_channels_command') {
       try {
         await rateLimiter.consume(callbackUserId.toString());
       } catch (rateLimiterRes) {
@@ -294,7 +294,7 @@ bot.onText(/\/start/, async (msg) => {
 - أكمل عملية الشراء
 - استخدم الرمز لتفعيل الاشتراك
 - وبإمكانك تمديد اشتراكك
-عن طريق زر *معرفة الاشتراك*
+عن طريق زر *حالة الاشتراك*
       
 👇🏻 **انضم الآن وقم بزيارة المتجر والاشتراك!** 👇🏻
 [رابط متجر دزرت فوري](https://dzrt.com)
@@ -460,7 +460,9 @@ async function activateSubscription(userId, code, callback) {
   }
 }
 
+
 // التعامل مع التجربة المجانية
+
 async function handleFreeTrial(userId, callback) {
   let connection;
   try {
@@ -487,7 +489,6 @@ async function handleFreeTrial(userId, callback) {
         await activateFreeTrial(userId, connection);
         await connection.execute('UPDATE trial_usage SET count = count + 1 WHERE id = 1');
         await connection.commit();
-        console.log('Trial count after update:', trialCount + 1);
         callback('تم تفعيل الاشتراك التجريبي المجاني \n ليوم واحد  🎉 \n\n\n\n اختر مالقنوات التي تريد الانضمام لها ', true);
       }
     } else {

@@ -32,7 +32,8 @@ const urls = [
 const token = '6749756089:AAFMCjy0-85EkyQIrzC4tJU5jIyFJvpnLEI';
 const chatId = '-1002122565496';
 const bot = new TelegramBot(token, { polling: true });
-const productCooldown = 30 * 60 * 1000; // فترة التهدئة لكل منتج على حدة: 25 دقيقة بالمللي ثانية
+
+const productCooldown = 15 * 60 * 1000; // فترة التهدئة لكل منتج على حدة: 25 دقيقة بالمللي ثانية
 let productStatus = {};
 
 urls.forEach(url => {
@@ -59,7 +60,7 @@ async function checkProductAvailability(url) {
 
       if (!isUnavailable && (currentTime - productStatus[url].individualCooldownTime > productCooldown)) {
         // المنتج متوفر الآن وفترة التهدئة الفردية قد انقضت
-        const message = `*${productNameAr}* - متوفر الآن ✅ \n[ أضغط هنا ](${url})`;
+        const message = `*${productNameAr}* - متوفر الآن ✅ \n[ أضغط هنا - اضافة الى السلة ](${url})`;
         const sentMessage = await bot.sendPhoto(chatId, imageUrl, { caption: message, parse_mode: 'Markdown' });
         
         productStatus[url] = {
@@ -97,7 +98,7 @@ cron.schedule('* * * * * *', () => {
   const now = new Date();
   const hour = now.getHours();
 
-  if (hour >= 13 && hour <= 21) {
+  if (hour >= 13 && hour <= 22) {
     checkAllUrls();
   }
 });
