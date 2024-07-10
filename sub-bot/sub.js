@@ -20,13 +20,6 @@ const pool = mysql.createPool(dbConfig);
 const activeUsers = new Map();
 const userClicks = new Map();
 const rateLimitMap = new Map(); // لتتبع آخر وقت تلقى فيه المستخدم أمر /start
-
-const rateLimiter = new rateLimit.RateLimiterMemory({
-  points: 2, // عدد النقاط المتاحة لكل فترة
-  duration: 2, // المدة بالثواني لكل نقطة
-  blockDuration: 2, // مدة الحظر بالثواني إذا تم تجاوز عدد النقاط المسموح بها
-});
-
 // تفعيل اشتراك المستخدم
 async function activateUserSubscription(userId, code, duration, callback) {
   let connection;
@@ -215,7 +208,6 @@ bot.onText(/\/start/, async (msg) => {
   }
 
   const isSubscribed = await isUserSubscribed(userId);
-
   const mainKeyboard = {
     inline_keyboard: [
       isSubscribed ? [
@@ -225,15 +217,21 @@ bot.onText(/\/start/, async (msg) => {
         { text: 'تجربة مجانية 🎁', callback_data: 'free_trial_command' },
         { text: 'تفعيل الاشتراك 🔑', callback_data: 'activate_subscription_command' }
       ],
-      [
+      isSubscribed ? [
         { text: 'الدعم الفني 📩', url: 'https://t.me/MZZ_2' },
         { text: 'حالة الاشتراك 📊', callback_data: 'subscription_status_command' }
+      ] : [
+        { text: 'الدعم الفني 📩', url: 'https://t.me/MZZ_2' },
+        { text: 'القروب العام 📢', url: 'https://t.me/+hrIusgChjeMwY2Zk' }
+
       ],
       [
         { text: 'رابط المتجر 🛒', url: 'https://www.dzrt.com/ar/our-products.html' }
       ]
     ]
   };
+
+
 
   const welcomeMessage = `
 ⚡ **انضم إلى البوت الأسرع والأكثر تقدمًا** ⚡
@@ -263,20 +261,6 @@ bot.onText(/\/start/, async (msg) => {
     const data = callbackQuery.data;
     const callbackUserId = callbackQuery.from.id;
     if (callbackUserId !== userId) return;
-    
-    // التحقق من النقر المتتالي السريع باستثناء أوامر معينة
-    if (data !== 'start' && data !== 'notification_channels_command') {
-      try {
-        await rateLimiter.consume(callbackUserId.toString());
-      } catch (rateLimiterRes) {
-        bot.answerCallbackQuery(callbackQuery.id, {
-          text: '⚠️\n\nتجنب النقر المتتالي على الأزرار \n\n تم إيقاف البوت لمدة قصيرة',
-          show_alert: true
-        }); 
-        return;
-      }
-    }
-    
     const updateMessage = (text, keyboard, msg) => {
       const isContentDifferent = msg.text !== text;
       const isKeyboardDifferent = JSON.stringify(msg.reply_markup) !== JSON.stringify(keyboard);
@@ -550,4 +534,3 @@ cron.schedule('0 12 * * *', async () => {
     if (connection) connection.release();
   }
 });
-
