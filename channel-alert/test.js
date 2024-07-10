@@ -3,6 +3,7 @@ const cheerio = require('cheerio-without-node-native');
 const TelegramBot = require('node-telegram-bot-api');
 const cron = require('node-cron');
 const path = require('path');
+const mysql = require('mysql2/promise');
 const puppeteer = require('puppeteer');
 require('dotenv').config();
 
@@ -70,7 +71,8 @@ async function checkProductAvailability(url) {
 
       if (!isUnavailable && (currentTime - productStatus[url].individualCooldownTime > productCooldown)) {
         // المنتج متوفر الآن وفترة التهدئة الفردية قد انقضت
-        const message = `*${productNameAr}* - متوفر الآن ✅ \n[ أضغط هنا - اضافة الى السلة ](${url})`;
+        const message = `*${productNameAr}* - متوفر الآن ✅`;
+        console.log(`*${productNameAr}* - متوفر الآن ✅`);
         const replyMarkup = {
           inline_keyboard: [
             [
@@ -130,139 +132,3 @@ cron.schedule('* * * * * *', () => {
 });
 
 
-
-
-
-const dbConfig = {
-  host: process.env.DB_HOST,
-  user: process.env.DB_USER,
-  password: process.env.DB_PASSWORD,
-  database: process.env.DB_DATABASE,
-  port: process.env.DB_PORT
-};
-// إنشاء مجموعة من الاتصالات
-const pool = mysql.createPool(dbConfig);
-
-async function checkUserSubscriptions() {
-  const currentDate = new Date().toISOString().split('T')[0];
-  const query = 'SELECT id, expiryDate FROM users WHERE activated = true';
-  let connection;
-
-  try {
-    connection = await pool.getConnection();
-    const [results] = await connection.query(query);
-    const usersToUnban = results.filter(user => new Date(user.expiryDate) < new Date(currentDate));
-
-    for (const user of usersToUnban) {
-      const channelIds = [
-        process.env.CHAT_ID_MAIN,  // تأكيد إضافة القناة الأساسية هنا
-        process.env.CHAT_ID_ICY_RUSH,
-        process.env.CHAT_ID_SEASIDE,
-        process.env.CHAT_ID_SAMRA,
-        process.env.CHAT_ID_HIGH,
-        process.env.CHAT_ID_GARDEN,
-        process.env.CHAT_ID_MINT,
-        process.env.CHAT_ID_HAILA,
-        process.env.CHAT_ID_PURPPLE,
-        process.env.CHAT_ID_EDGY,
-        process.env.CHAT_ID_TAMRA
-      ];
-
-      try {
-        await unbanUserFromAllChannels(user.id, channelIds);
-        await deactivateUserSubscription(user.id);
-      } catch (error) {
-        console.error(`Failed to process user ${user.id}:`, error);
-      }
-    }
-  } catch (err) {
-    console.error('Error reading subscriptions from database:', err);
-  } finally {
-    if (connection) {
-      connection.release();
-    }
-  }
-}
-
-async function unbanUserFromAllChannels(userId, channelIds) {
-  for (const channelId of channelIds) {
-    if (channelId) {
-      try {
-        await bot.unbanChatMember(channelId, userId);
-        // إضافة تأخير قدره 1 ثانية بين كل عملية إزالة
-        await delay(1000);
-      } catch (error) {
-        console.error(`Failed to unban user ${userId} from channel ${channelId}:`, error);
-      }
-    }
-  }
-}
-
-async function deactivateUserSubscription(userId) {
-  let connection;
-  try {
-    connection = await pool.getConnection();
-    const deactivateQuery = 'UPDATE users SET activated = 0 WHERE id = ?';
-    await connection.query(deactivateQuery, [userId]);
-  } catch (err) {
-    console.error('Error deactivating subscription:', err);
-  } finally {
-    if (connection) {
-      connection.release();
-    }
-  }
-}
-
-async function handleJoinRequests(request) {
-  if (request) {
-    const userId = request.user_chat_id;
-    const channelId = request.chat.id;
-    const query = 'SELECT id FROM users WHERE id = ? AND activated = true';
-    let connection;
-
-    try {
-      connection = await pool.getConnection();
-      const [results] = await connection.query(query, [userId]);
-
-      if (results.length > 0) {
-        try {
-          await approveJoinRequestWithDelay(channelId, userId);
-        } catch (error) {
-          console.error(`Failed to approve join request for user ${userId} in channel ${channelId}:`, error);
-        }
-      }
-    } catch (err) {
-      console.error('Error reading subscriptions from database:', err);
-    } finally {
-      if (connection) {
-        connection.release();
-      }
-    }
-  }
-}
-
-async function approveJoinRequestWithDelay(channelId, userId) {
-  return new Promise((resolve, reject) => {
-    setTimeout(async () => {
-      try {
-        await bot.approveChatJoinRequest(channelId, userId);
-        resolve();
-      } catch (error) {
-        reject(error);
-      }
-    }, 5000); // إضافة تأخير قدره 5 ثواني
-  });
-}
-
-bot.on('chat_join_request', (request) => {
-  handleJoinRequests(request);
-});
-
-// جدولة إعادة التحقق من الاشتراكات يوميًا عند الساعة 12:00 بعد منتصف الليل
-cron.schedule('0 0 * * *', () => {
-  checkUserSubscriptions();
-});
-
-function delay(ms) {
-  return new Promise(resolve => setTimeout(resolve, ms));
-}
