@@ -49,7 +49,8 @@ const mainChannelId = process.env.CHAT_ID_MAIN;
 const token = process.env.TOKEN3;
 const bot = new TelegramBot(token, { polling: true });
 
-const productCooldown = 30 * 60 * 1000; // فترة التهدئة الفردية (15 دقائق)
+const productCooldown = 30 * 60 * 1000; // فترة التهدئة الفردية (30 دقائق)
+const confirmationPeriod = 8 * 1000; // فترة التأكيد قبل إرسال إشعار النفاد (10 ثواني)
 
 const productStatus = {};
 
@@ -59,7 +60,8 @@ urls.forEach(url => {
     lastNotificationTime: 0,
     isNotifying: false,
     isOutOfStockNotified: false,
-    individualCooldownTime: 0
+    individualCooldownTime: 0,
+    outOfStockStartTime: 0 // وقت بداية فترة التأكيد لنفاد المنتج
   };
 });
 
@@ -79,7 +81,7 @@ async function checkProductAvailability(url) {
       if (!isUnavailable && (currentTime - productStatus[url].individualCooldownTime > productCooldown)) {
         const message = `*${productNameAr}* - متوفر الآن ✅`;
         console.log(`*${productNameAr}* - متوفر الآن ✅`);
-        
+
         const replyMarkup = {
           inline_keyboard: [
             [
@@ -110,27 +112,39 @@ async function checkProductAvailability(url) {
           lastNotificationTime: currentTime,
           isNotifying: true,
           isOutOfStockNotified: false,
-          individualCooldownTime: currentTime // إعادة تعيين إلى الوقت الحالي
+          individualCooldownTime: currentTime, // إعادة تعيين إلى الوقت الحالي
+          outOfStockStartTime: 0 // إعادة تعيين وقت بداية فترة التأكيد
         };
 
         setTimeout(() => {
           productStatus[url].isNotifying = false;
         }, productCooldown);
+      
       // عند نفاد المنتج
       } else if (isUnavailable && productStatus[url].isAvailable && !productStatus[url].isOutOfStockNotified) {
-        const message = `*${productNameAr}* - نفذ من المخزون ❌`;
-        await bot.sendPhoto(channels[url].chatId, imageUrlUnavailable, {
-          caption: message,
-          parse_mode: 'Markdown'
-        });
+        // التحقق من فترة التأكيد
+        if (productStatus[url].outOfStockStartTime === 0) {
+          productStatus[url].outOfStockStartTime = currentTime; // تعيين وقت بداية فترة التأكيد
+        } else if (currentTime - productStatus[url].outOfStockStartTime > confirmationPeriod) {
+          const message = `*${productNameAr}* - نفذ من المخزون ❌`;
+          await bot.sendPhoto(channels[url].chatId, imageUrlUnavailable, {
+            caption: message,
+            parse_mode: 'Markdown'
+          });
 
-        // إعادة تعيين فترة التهدئة عند نفاد المنتج
-        productStatus[url].isOutOfStockNotified = true;
-        productStatus[url].individualCooldownTime = 0; // تعيين إلى 0 يعني إعادة تعيين فترة التهدئة
-        productStatus[url].isAvailable = false;
+          // إعادة تعيين فترة التهدئة عند نفاد المنتج
+          productStatus[url].isOutOfStockNotified = true;
+          productStatus[url].individualCooldownTime = 0; // تعيين إلى 0 يعني إعادة تعيين فترة التهدئة
+          productStatus[url].isAvailable = false;
+          productStatus[url].outOfStockStartTime = 0; // إعادة تعيين وقت بداية فترة التأكيد
+        }
+      } else if (!isUnavailable) {
+        // إعادة تعيين وقت بداية فترة التأكيد إذا عاد المنتج إلى التوفر قبل انتهاء فترة التأكيد
+        productStatus[url].outOfStockStartTime = 0;
       }
     }
   } catch (error) {
+    console.error(`Error checking product availability for ${url}:`, error);
   }
 }
 
