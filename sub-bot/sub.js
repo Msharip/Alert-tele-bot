@@ -1,8 +1,9 @@
 const TelegramBot = require('node-telegram-bot-api');
 const mysql = require('mysql2/promise');
 const cron = require('node-cron');
-const rateLimit = require('rate-limiter-flexible');
+const { RateLimiterMemory } = require('rate-limiter-flexible');
 require('dotenv').config();
+
 // إعدادات قاعدة البيانات
 const dbConfig = {
   host: process.env.DB_HOST,
@@ -20,6 +21,13 @@ const pool = mysql.createPool(dbConfig);
 const activeUsers = new Map();
 const userClicks = new Map();
 const rateLimitMap = new Map(); // لتتبع آخر وقت تلقى فيه المستخدم أمر /start
+const userSubscriptions = new Map(); // لتخزين حالة الاشتراك مؤقتًا
+
+const rateLimiter = new RateLimiterMemory({
+  points: 5, // عدد النقاط التي يمكن للمستخدم الحصول عليها
+  duration: 10, // مدة الصلاحية للنقاط بالثواني
+});
+
 // تفعيل اشتراك المستخدم
 async function activateUserSubscription(userId, code, duration, callback) {
   let connection;
@@ -53,6 +61,7 @@ async function activateUserSubscription(userId, code, duration, callback) {
     }
 
     await connection.execute('UPDATE users SET activated = true WHERE id = ?', [userId]);
+    userSubscriptions.set(userId, true); // تحديث حالة الاشتراك
   } catch (err) {
     if (connection) await connection.rollback();
     console.error('Error activating subscription:', err);
@@ -119,11 +128,17 @@ async function deleteActivationCode(connection, code) {
 
 // دالة للتحقق من حالة الاشتراك
 async function isUserSubscribed(userId) {
+  if (userSubscriptions.has(userId)) {
+    return userSubscriptions.get(userId);
+  }
+
   let connection;
   try {
     connection = await pool.getConnection();
     const [results] = await connection.execute('SELECT activated FROM users WHERE id = ?', [userId]);
-    return results.length > 0 && results[0].activated === 1;
+    const isSubscribed = results.length > 0 && results[0].activated === 1;
+    userSubscriptions.set(userId, isSubscribed); // تخزين حالة الاشتراك مؤقتًا
+    return isSubscribed;
   } catch (err) {
     console.error('Error checking subscription status:', err);
     return false;
@@ -131,6 +146,7 @@ async function isUserSubscribed(userId) {
     if (connection) connection.release();
   }
 }
+
 const notificationChannelsKeyboard = {
   inline_keyboard: [
     [
@@ -184,11 +200,11 @@ bot.onText(/\/start/, async (msg) => {
   const currentTime = new Date().getTime();
   const lastStartTime = rateLimitMap.get(userId) || 0;
 
-  // تحديد فترة السماح بالمللي ثانية (مثلاً 20 ثواني)
+  // تحديد فترة السماح بالمللي ثانية (مثلاً 20 ثانية)
   const timeLimit = 20000;
 
   if (currentTime - lastStartTime < timeLimit) {
-    bot.sendMessage(chatId, '⚠️  تجنب ارسال امر - /start - متكرر\n\n سيتم حظرك فورا اذا تم تكرار ذلك 2 من المرات \n\n تم ايقاف الامر موقتا لمده من الوقت');
+    bot.sendMessage(chatId, '⚠️  تجنب ارسال امر - /start - متكرر\n\n \n\n تم ايقاف الامر موقتا لمده من الوقت');
     return;
   }
 
@@ -223,15 +239,12 @@ bot.onText(/\/start/, async (msg) => {
       ] : [
         { text: 'الدعم الفني 📩', url: 'https://t.me/MZZ_2' },
         { text: 'القروب العام 📢', url: 'https://t.me/+hrIusgChjeMwY2Zk' }
-
       ],
       [
         { text: 'رابط المتجر 🛒', url: 'https://www.dzrt.com/ar/our-products.html' }
       ]
     ]
   };
-
-
 
   const welcomeMessage = `
 ⚡ **انضم إلى البوت الأسرع والأكثر تقدمًا** ⚡
@@ -273,6 +286,7 @@ bot.onText(/\/start/, async (msg) => {
           parse_mode: 'Markdown'
         }).catch((error) => {
           if (error.response.body.error_code === 400 && error.response.body.description.includes("message is not modified")) {
+            // لا يوجد تغيير في الرسالة
           }
         });
       }
