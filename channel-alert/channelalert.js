@@ -50,7 +50,7 @@ const token = process.env.TOKEN3;
 const bot = new TelegramBot(token, { polling: true });
 
 const productCooldown = 30 * 60 * 1000; // فترة التهدئة الفردية (30 دقائق)
-const confirmationPeriod = 8 * 1000; // فترة التأكيد قبل إرسال إشعار النفاد (10 ثواني)
+const confirmationPeriod = 8 * 1000; // فترة التأكيد قبل إرسال إشعار النفاد (8 ثواني)
 
 const productStatus = {};
 
