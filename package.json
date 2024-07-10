@@ -16,6 +16,7 @@
     "axios": "^1.7.2",
     "cheerio": "^1.0.0-rc.12",
     "cheerio-without-node-native": "^1.0.0-rc.2",
+    "cloudscraper": "^4.6.0",
     "dotenv": "^16.4.5",
     "express": "^4.19.2",
     "ioredis": "^5.4.1",
