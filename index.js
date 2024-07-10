@@ -1,10 +1,10 @@
 const express = require('express');
 const app = express();
 
-require('./channel-alert/channelalert.js');
-require('./tele/tele.js');
-require('./sub-bot/sub.js');
-//require('./channel-alert/test.js');
+//require('./channel-alert/channelalert.js');
+//require('./tele/tele.js');
+//require('./sub-bot/sub.js');
+require('./channel-alert/test.js');
 
 
 
