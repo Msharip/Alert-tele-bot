@@ -2,10 +2,8 @@ const axios = require('axios');
 const cheerio = require('cheerio');
 const TelegramBot = require('node-telegram-bot-api');
 const cron = require('node-cron');
-const express = require('express');
 const { TwitterApi } = require('twitter-api-v2');
 const path = require('path');
-const app = express();
 
 const productNames = {
 

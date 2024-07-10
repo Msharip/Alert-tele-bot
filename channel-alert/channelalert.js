@@ -49,7 +49,7 @@ const mainChannelId = process.env.CHAT_ID_MAIN;
 const token = process.env.TOKEN3;
 const bot = new TelegramBot(token, { polling: true });
 
-const productCooldown = 15 * 60 * 1000; // فترة التهدئة الفردية (15 دقائق)
+const productCooldown = 30 * 60 * 1000; // فترة التهدئة الفردية (15 دقائق)
 
 const productStatus = {};
 
