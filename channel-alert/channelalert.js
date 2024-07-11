@@ -4,6 +4,8 @@ const TelegramBot = require('node-telegram-bot-api');
 const cron = require('node-cron');
 const path = require('path');
 const mysql = require('mysql2/promise');
+const moment = require('moment-timezone');
+
 require('dotenv').config();
 
 const productNames = {
@@ -48,7 +50,7 @@ const channels = {
 const mainChannelId = process.env.CHAT_ID_MAIN;
 const token = process.env.TOKEN3;
 const bot = new TelegramBot(token, { polling: true });
-const productCooldown = 14 * 60 * 1000; // فترة التهدئة الفردية (10 دقائق)
+const productCooldown = 14 * 60 * 1000; // فترة التهدئة الفردية (14 دقيقة)
 
 const productStatus = {};
 
@@ -74,8 +76,9 @@ async function checkProductAvailability(url) {
       const imageUrlAvailable = path.join(__dirname, '..', 'images', `${productNames[url].en}.png`);
 
       if (!isUnavailable && (currentTime - productStatus[url].individualCooldownTime > productCooldown)) {
-        const message = `*${productNameAr}* - متوفر الآن ✅`;
-        console.log(`*${productNameAr}* - متوفر الآن ✅`);
+        const localTime = moment(currentTime).tz('Asia/Riyadh').format('YYYY-MM-DD HH:mm:ss');
+        const message = `*${productNameAr}* - متوفر الآن ✅ الساعة ${localTime}`;
+        console.log(message);
 
         const replyMarkup = {
           inline_keyboard: [
@@ -117,12 +120,13 @@ async function checkProductAvailability(url) {
         const connection = await pool.getConnection();
         try {
           const query = 'INSERT INTO product_notifications (product_url, notification_time) VALUES (?, ?)';
-          await connection.query(query, [url, new Date(currentTime).toISOString().slice(0, 19).replace('T', ' ')]);
+          await connection.query(query, [url, localTime]);
         } finally {
           connection.release();
         }
       } else if (isUnavailable) {
         // إذا كان المنتج غير متوفر، لا نفعل شيئاً
+        productStatus[url].isAvailable = false;
       }
     }
   } catch (error) {
@@ -141,7 +145,7 @@ cron.schedule('* * * * * *', () => {
   const now = new Date();
   const hour = now.getHours();
 
-  if (hour >= 13 && hour <= 21) {
+  if (hour >= 13 && hour <= 22) {
     checkAllUrls();
   }
 });
@@ -295,8 +299,8 @@ async function deleteOldNotifications() {
   }
 }
 
-// جدولة حذف السجلات القديمة كل 3 أيام
-cron.schedule('0 0 */3 * *', () => {
+// جدولة حذف السجلات القديمة كل 6 ايام الصبح
+cron.schedule('0 6 */3 * *', () => {
   deleteOldNotifications();
 });
 

@@ -217,10 +217,12 @@ bot.onText(/\/start/, async (msg) => {
     const previousMessages = userMessagesMap.get(userId);
     previousMessages.forEach(messageId => {
       bot.deleteMessage(chatId, messageId).catch((error) => {
+        console.error('Error deleting previous message:', error);
       });
     });
     userMessagesMap.delete(userId);
   }
+
   const isSubscribed = await isUserSubscribed(userId);
   const mainKeyboard = {
     inline_keyboard: [
@@ -365,11 +367,11 @@ bot.onText(/\/start/, async (msg) => {
         ]
       };
       updateMessage(supportMessage, keyboard, msg);
-    }else if (data === 'free_trial_command') {
+    } else if (data === 'free_trial_command') {
       handleFreeTrial(userId, async (response, showChannelsButton) => {
         const keyboard = showChannelsButton ? notificationChannelsKeyboard : supportAndBackKeyboard;
         updateMessage(response, keyboard, msg);
-    
+
         // إذا تم تفعيل التجربة المجانية، قم بتحديث لوحة المفاتيح الرئيسية
         if (showChannelsButton) {
           const updatedMainKeyboard = {
@@ -377,8 +379,9 @@ bot.onText(/\/start/, async (msg) => {
               [
                 { text: 'وقت توفر المنتجات ⏰', callback_data: 'product_availability_command' }
               ],
-              { text: 'قنوات التنبيهات 🔔', callback_data: 'notification_channels_command' },
-              [ { text: 'تفعيل الاشتراك 🔑', callback_data: 'activate_subscription_command' }
+              [
+                { text: 'قنوات التنبيهات 🔔', callback_data: 'notification_channels_command' },
+                { text: 'تفعيل الاشتراك 🔑', callback_data: 'activate_subscription_command' },
               ],
               [
                 { text: 'الدعم الفني 📩', url: 'https://t.me/MZZ_2' },
@@ -409,57 +412,40 @@ bot.onText(/\/start/, async (msg) => {
         };
         updateMessage(response, keyboard, msg);
       });
-    }else if (data === 'product_availability_command') {
-      const isSubscribed = await isUserSubscribed(userId);
-      if (!isSubscribed) {
-        bot.sendMessage(chatId, '⚠️ هذا الخيار متاح للمشتركين فقط. يرجى الاشتراك للوصول إلى هذه الميزة.');
-        return;
-      }
-    
-      getProductAvailability((response) => {
-        const keyboard = {
-          inline_keyboard: [
-            [
-              { text: 'رجوع 🔙', callback_data: 'start' }
-            ]
-          ]
-        };
-        updateMessage(response, keyboard, msg);
-      });
     } else if (data === 'start') {
       activeUsers.delete(userId);
       updateMessage(welcomeMessage, mainKeyboard, msg);
     }
-    });
-    
-    bot.on('message', async (msg) => {
-      const userId = msg.from.id;
-      const chatId = msg.chat.id;
-    
-      if (activeUsers.has(userId) && (activeUsers.get(userId) === 'activating' || activeUsers.get(userId) === 'extending')) {
-        const code = msg.text.trim();
-        const action = activeUsers.get(userId);
-        activeUsers.delete(userId);
-    
-        const callback = async (res) => {
-          await bot.sendMessage(chatId, res, { parse_mode: 'Markdown' });
-    
-          if (!res.includes('⚠️')) {
-            const fullResponse = `
-    اختر قناة المنتجات التي ترغب بها🔔
-    \n\n\n
-    واستمتع باسرع اشعارات لمنتجاتك المخصصة:**`;
-            await bot.sendMessage(chatId, fullResponse, {
-              reply_markup: notificationChannelsKeyboard,
-              parse_mode: 'Markdown'
-            });
-          }
-        };
-    
-        if (action === 'activating') {
-          await activateSubscription(userId, code, callback);
-        } else if (action === 'extending') {
-          await activateSubscription(userId, code, callback);
+  });
+
+  bot.on('message', async (msg) => {
+    const userId = msg.from.id;
+    const chatId = msg.chat.id;
+
+    if (activeUsers.has(userId) && (activeUsers.get(userId) === 'activating' || activeUsers.get(userId) === 'extending')) {
+      const code = msg.text.trim();
+      const action = activeUsers.get(userId);
+      activeUsers.delete(userId);
+
+      const callback = async (res) => {
+        await bot.sendMessage(chatId, res, { parse_mode: 'Markdown' });
+
+        if (!res.includes('⚠️')) {
+          const fullResponse = `
+اختر قناة المنتجات التي ترغب بها🔔
+\n\n\n
+واستمتع باسرع اشعارات لمنتجاتك المخصصة:**`;
+          await bot.sendMessage(chatId, fullResponse, {
+            reply_markup: notificationChannelsKeyboard,
+            parse_mode: 'Markdown'
+          });
+        }
+      };
+
+      if (action === 'activating') {
+        await activateSubscription(userId, code, callback);
+      } else if (action === 'extending') {
+        await activateSubscription(userId, code, callback);
       }
     }
   });
@@ -587,26 +573,25 @@ cron.schedule('0 12 * * *', async () => {
   }
 });
 
-// الحصول على وقت توفر المنتجات
-async function getProductAvailability(callback) {
-  let connection;
-  try {
-    connection = await pool.getConnection();
-    const [results] = await connection.execute('SELECT notification_time FROM product_notifications ORDER BY notification_time ASC LIMIT 1');
-    if (results.length === 0) {
-      callback('لا توجد معلومات متاحة حاليًا حول توفر المنتجات. ⚠️');
-      return;
+    // الحصول على وقت توفر المنتجات
+    async function getProductAvailability(callback) {
+      let connection;
+      try {
+        connection = await pool.getConnection();
+        const [results] = await connection.execute('SELECT notification_time FROM product_notifications ORDER BY notification_time ASC LIMIT 1');
+        if (results.length === 0) {
+          callback('لا توجد معلومات متاحة حاليًا حول توفر المنتجات. ⚠️');
+          return;
+        }
+    
+        const notificationTime = new Date(results[0].notification_time);
+        const formattedTime = notificationTime.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
+        const response = ` ** وقت أول إشعار للمنتج للثلاث ايام السابقه :**\n\n\n${formattedTime} 🕒`;
+        callback(response);
+      } catch (err) {
+        console.error('Error getting product availability:', err);
+        callback('⚠️ حدث خطأ أثناء الحصول على معلومات توفر المنتجات.');
+      } finally {
+        if (connection) connection.release();
+      }
     }
-
-    const notificationTime = new Date(results[0].notification_time);
-    const formattedTime = notificationTime.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
-    const response = ` ** وقت أول إشعار للمنتج للثلاث ايام السابقه :**\n\n\n${formattedTime} 🕒`;
-    callback(response);
-  } catch (err) {
-    console.error('Error getting product availability:', err);
-    callback('⚠️ حدث خطأ أثناء الحصول على معلومات توفر المنتجات.');
-  } finally {
-    if (connection) connection.release();
-  }
-}
-
