@@ -217,7 +217,6 @@ bot.onText(/\/start/, async (msg) => {
     const previousMessages = userMessagesMap.get(userId);
     previousMessages.forEach(messageId => {
       bot.deleteMessage(chatId, messageId).catch((error) => {
-        console.error('Error deleting previous message:', error);
       });
     });
     userMessagesMap.delete(userId);
@@ -225,7 +224,10 @@ bot.onText(/\/start/, async (msg) => {
 
   const isSubscribed = await isUserSubscribed(userId);
   const mainKeyboard = {
-    inline_keyboard: [
+    inline_keyboard: [  
+        isSubscribed ? [
+      { text: 'وقت توفر المنتجات ⏰', callback_data: 'product_availability_command' }
+    ] : [],
       isSubscribed ? [
         { text: 'قنوات التنبيهات 🔔', callback_data: 'notification_channels_command' },
         { text: 'تفعيل الاشتراك 🔑', callback_data: 'activate_subscription_command' }
@@ -374,7 +376,8 @@ bot.onText(/\/start/, async (msg) => {
             inline_keyboard: [
               [
                 { text: 'قنوات التنبيهات 🔔', callback_data: 'notification_channels_command' },
-                { text: 'تفعيل الاشتراك 🔑', callback_data: 'activate_subscription_command' }
+                { text: 'تفعيل الاشتراك 🔑', callback_data: 'activate_subscription_command' },
+                { text: 'وقت توفر المنتجات ⏰', callback_data: 'product_availability_command' }
               ],
               [
                 { text: 'الدعم الفني 📩', url: 'https://t.me/MZZ_2' },
@@ -387,6 +390,23 @@ bot.onText(/\/start/, async (msg) => {
           };
           mainKeyboard.inline_keyboard = updatedMainKeyboard.inline_keyboard;
         }
+      });
+    } else if (data === 'product_availability_command') {
+      const isSubscribed = await isUserSubscribed(userId);
+      if (!isSubscribed) {
+        bot.sendMessage(chatId, '⚠️ هذا الخيار متاح للمشتركين فقط. يرجى الاشتراك للوصول إلى هذه الميزة.');
+        return;
+      }
+
+      getProductAvailability((response) => {
+        const keyboard = {
+          inline_keyboard: [
+            [
+              { text: 'رجوع 🔙', callback_data: 'start' }
+            ]
+          ]
+        };
+        updateMessage(response, keyboard, msg);
       });
     } else if (data === 'start') {
       activeUsers.delete(userId);
@@ -548,3 +568,27 @@ cron.schedule('0 12 * * *', async () => {
     if (connection) connection.release();
   }
 });
+
+// الحصول على وقت توفر المنتجات
+async function getProductAvailability(callback) {
+  let connection;
+  try {
+    connection = await pool.getConnection();
+    const [results] = await connection.execute('SELECT notification_time FROM product_notifications ORDER BY notification_time ASC LIMIT 1');
+    if (results.length === 0) {
+      callback('لا توجد معلومات متاحة حاليًا حول توفر المنتجات. ⚠️');
+      return;
+    }
+
+    const notificationTime = new Date(results[0].notification_time);
+    const formattedTime = notificationTime.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
+    const response = ` ** وقت أول إشعار للمنتج للثلاث ايام السابقه :**\n\n\n${formattedTime} 🕒`;
+    callback(response);
+  } catch (err) {
+    console.error('Error getting product availability:', err);
+    callback('⚠️ حدث خطأ أثناء الحصول على معلومات توفر المنتجات.');
+  } finally {
+    if (connection) connection.release();
+  }
+}
+
