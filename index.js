@@ -2,8 +2,8 @@ const express = require('express');
 const app = express();
 
 //SUB-CHANNELES
-require('./channel-alert/channelalert.js');
-//require('./channel-alert/test.js');
+//require('./channel-alert/channelalert.js');
+require('./channel-alert/test.js');
 //require('./channel-alert/test-cloudflare.js');
 
 
