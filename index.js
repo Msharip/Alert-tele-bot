@@ -14,7 +14,7 @@ require('./tele/tele.js');
 //require('./tele/tele-passcloudflare.js')
 
 // SUB-BOT
-require('./sub-bot/sub.js');
+//require('./sub-bot/sub.js');
 console.log('all Bots are Ruuning');
 
 const port = process.env.PORT || 3000;
