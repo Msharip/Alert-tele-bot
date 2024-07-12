@@ -51,6 +51,7 @@ const mainChannelId = process.env.CHAT_ID_MAIN;
 const token = process.env.TOKEN3;
 const bot = new TelegramBot(token, { polling: true });
 const productCooldown = 14 * 60 * 1000; // فترة التهدئة الفردية (14 دقيقة)
+const firstNotificationSaved = false; // متغير للتحقق مما إذا تم حفظ أول إشعار أم لا
 
 const productStatus = {};
 
@@ -77,8 +78,8 @@ async function checkProductAvailability(url) {
 
       if (!isUnavailable && (currentTime - productStatus[url].individualCooldownTime > productCooldown)) {
         const localTime = moment(currentTime).tz('Asia/Riyadh').format('YYYY-MM-DD HH:mm:ss');
-        const message = `*${productNameAr}* - متوفر الآن ✅ الساعة ${localTime}`;
-        console.log(message);
+        const message = `*${productNameAr}* - متوفر الآن ✅`;
+        console.log(`*${productNameAr}* - متوفر الآن ✅`);
 
         const replyMarkup = {
           inline_keyboard: [
@@ -116,13 +117,16 @@ async function checkProductAvailability(url) {
           productStatus[url].isNotifying = false;
         }, productCooldown);
 
-        // إضافة وقت أول إشعار إلى قاعدة البيانات
-        const connection = await pool.getConnection();
-        try {
-          const query = 'INSERT INTO product_notifications (product_url, notification_time) VALUES (?, ?)';
-          await connection.query(query, [url, localTime]);
-        } finally {
-          connection.release();
+        if (!firstNotificationSaved) {
+          // إضافة وقت أول إشعار إلى قاعدة البيانات لأول منتج فقط
+          const connection = await pool.getConnection();
+          try {
+            const query = 'INSERT INTO product_notifications (product_url, notification_time) VALUES (?, ?)';
+            await connection.query(query, [url, localTime]);
+            firstNotificationSaved = true; // تعيين المتغير بعد حفظ أول إشعار
+          } finally {
+            connection.release();
+          }
         }
       } else if (isUnavailable) {
         // إذا كان المنتج غير متوفر، لا نفعل شيئاً
@@ -299,11 +303,12 @@ async function deleteOldNotifications() {
   }
 }
 
-// جدولة حذف السجلات القديمة كل 6 ايام الصبح
-cron.schedule('0 6 */3 * *', () => {
+// جدولة حذف السجلات القديمة كل 3 أيام في الساعة 8 صباحًا
+cron.schedule('0 8 */3 * *', () => {
   deleteOldNotifications();
 });
 
 function delay(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
+

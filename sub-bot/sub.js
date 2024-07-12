@@ -573,25 +573,32 @@ cron.schedule('0 12 * * *', async () => {
   }
 });
 
-    // الحصول على وقت توفر المنتجات
-    async function getProductAvailability(callback) {
-      let connection;
-      try {
-        connection = await pool.getConnection();
-        const [results] = await connection.execute('SELECT notification_time FROM product_notifications ORDER BY notification_time ASC LIMIT 1');
-        if (results.length === 0) {
-          callback('لا توجد معلومات متاحة حاليًا حول توفر المنتجات. ⚠️');
-          return;
-        }
-    
-        const notificationTime = new Date(results[0].notification_time);
-        const formattedTime = notificationTime.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
-        const response = ` ** وقت أول إشعار للمنتج للثلاث ايام السابقه :**\n\n\n${formattedTime} 🕒`;
-        callback(response);
-      } catch (err) {
-        console.error('Error getting product availability:', err);
-        callback('⚠️ حدث خطأ أثناء الحصول على معلومات توفر المنتجات.');
-      } finally {
-        if (connection) connection.release();
-      }
+async function getProductAvailability(callback) {
+  let connection;
+  try {
+    connection = await pool.getConnection();
+    const threeDaysAgo = new Date(new Date().setDate(new Date().getDate() - 3)).toISOString().slice(0, 19).replace('T', ' ');
+
+    const [results] = await connection.execute('SELECT notification_time FROM product_notifications WHERE notification_time >= ? ORDER BY notification_time ASC', [threeDaysAgo]);
+    if (results.length === 0) {
+      callback('لا توجد معلومات متاحة حاليًا حول توفر المنتجات. ⚠️');
+      return;
     }
+
+    let response = `** وقت أول إشعار للثلاثة ايام السابقة :**\n\n`;
+    results.forEach((row, index) => {
+      const notificationTime = new Date(row.notification_time);
+      const dayName = notificationTime.toLocaleDateString('ar-SA', { weekday: 'long' });
+      const formattedTime = notificationTime.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
+      response += `\n ${dayName} - ${formattedTime} 🕒\n`;
+    });
+
+    callback(response);
+  } catch (err) {
+    console.error('Error getting product availability:', err);
+    callback('⚠️ حدث خطأ أثناء الحصول على معلومات توفر المنتجات.');
+  } finally {
+    if (connection) connection.release();
+  }
+}
+
