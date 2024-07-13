@@ -579,7 +579,15 @@ async function getProductAvailability(callback) {
     connection = await pool.getConnection();
     const threeDaysAgo = new Date(new Date().setDate(new Date().getDate() - 3)).toISOString().slice(0, 19).replace('T', ' ');
 
-    const [results] = await connection.execute('SELECT notification_time FROM product_notifications WHERE notification_time >= ? ORDER BY notification_time ASC', [threeDaysAgo]);
+    // Adjusting the query to get the first notification of each day
+    const [results] = await connection.execute(`
+      SELECT MIN(notification_time) as notification_time 
+      FROM product_notifications 
+      WHERE notification_time >= ? 
+      GROUP BY DATE(notification_time) 
+      ORDER BY notification_time ASC
+    `, [threeDaysAgo]);
+
     if (results.length === 0) {
       callback('لا توجد معلومات متاحة حاليًا حول توفر المنتجات. ⚠️');
       return;
@@ -601,4 +609,5 @@ async function getProductAvailability(callback) {
     if (connection) connection.release();
   }
 }
+
 
