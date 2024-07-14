@@ -125,9 +125,10 @@ async function deleteActivationCode(connection, code) {
   const deleteQuery = 'DELETE FROM activationcodes WHERE activation_code = ?';
   await connection.execute(deleteQuery, [code]);
 }
+
 // دالة للتحقق من حالة الاشتراك
-async function isUserSubscribed(userId, forceUpdate = false) {
-  if (!forceUpdate && userSubscriptions.has(userId)) {
+async function isUserSubscribed(userId) {
+  if (userSubscriptions.has(userId)) {
     return userSubscriptions.get(userId);
   }
 
@@ -181,7 +182,7 @@ const supportAndBackKeyboard = {
   inline_keyboard: [
     [
       { text: 'الدعم الفني 📩', url: 'https://t.me/MZZ_2' },
-      { text: 'رابط المتجر 🛒', url: 'http://www.dzrtgg.com/' }
+      { text: 'رابط المتجر 🛒', url: 'https://www.dzrt.com/ar/our-products.html' }
     ],
     [
       { text: 'رجوع 🔙', callback_data: 'start' }
@@ -195,7 +196,7 @@ const userMessagesMap = new Map();
 bot.onText(/\/start/, async (msg) => {
   const chatId = msg.chat.id;
   const userId = msg.from.id;
-
+  
   const currentTime = new Date().getTime();
   const lastStartTime = rateLimitMap.get(userId) || 0;
 
@@ -222,8 +223,32 @@ bot.onText(/\/start/, async (msg) => {
     userMessagesMap.delete(userId);
   }
 
-  const isSubscribed = await isUserSubscribed(userId, true); // فرض التحديث هنا
-  const mainKeyboard = getMainKeyboard(isSubscribed);
+  const isSubscribed = await isUserSubscribed(userId);
+  const mainKeyboard = {
+    inline_keyboard: [
+      isSubscribed ? [
+        { text: 'وقت توفر المنتجات ⏰', callback_data: 'product_availability_command' }
+      ] : [],
+      isSubscribed ? [
+        { text: 'قنوات التنبيهات 🔔', callback_data: 'notification_channels_command' },
+        { text: 'تفعيل الاشتراك 🔑', callback_data: 'activate_subscription_command' }
+      ] : [
+        { text: 'تجربة مجانية 🎁', callback_data: 'free_trial_command' },
+        { text: 'تفعيل الاشتراك 🔑', callback_data: 'activate_subscription_command' }
+      ],
+      isSubscribed ? [
+        { text: 'الدعم الفني 📩', url: 'https://t.me/MZZ_2' },
+        { text: 'حالة الاشتراك 📊', callback_data: 'subscription_status_command' }
+      ] : [
+        { text: 'الدعم الفني 📩', url: 'https://t.me/MZZ_2' },
+        { text: 'القروب العام 📢', url: 'https://t.me/+hrIusgChjeMwY2Zk' }
+      ],
+      [
+        { text: 'رابط المتجر 🛒', url: 'https://www.dzrt.com/ar/our-products.html' }
+      ]
+    ]
+  };
+  
 
   const welcomeMessage = `
 ⚡ **انضم إلى البوت الأسرع والأكثر تقدمًا** ⚡
@@ -238,7 +263,7 @@ bot.onText(/\/start/, async (msg) => {
 عن طريق زر *معرفة الاشتراك*
 
 👇🏻 **انضم الآن وقم بزيارة المتجر والاشتراك!** 👇🏻
-    www.dzrtgg.com
+[رابط متجر دزرت فوري](https://dzrt.com)
 `;
 
   bot.sendMessage(chatId, welcomeMessage, {
@@ -349,12 +374,29 @@ bot.onText(/\/start/, async (msg) => {
 
         // إذا تم تفعيل التجربة المجانية، قم بتحديث لوحة المفاتيح الرئيسية
         if (showChannelsButton) {
-          const updatedMainKeyboard = getMainKeyboard(true);
+          const updatedMainKeyboard = {
+            inline_keyboard: [
+              [
+                { text: 'وقت توفر المنتجات ⏰', callback_data: 'product_availability_command' }
+              ],
+              [
+                { text: 'قنوات التنبيهات 🔔', callback_data: 'notification_channels_command' },
+                { text: 'تفعيل الاشتراك 🔑', callback_data: 'activate_subscription_command' },
+              ],
+              [
+                { text: 'الدعم الفني 📩', url: 'https://t.me/MZZ_2' },
+                { text: 'حالة الاشتراك 📊', callback_data: 'subscription_status_command' }
+              ],
+              [
+                { text: 'رابط المتجر 🛒', url: 'https://www.dzrt.com/ar/our-products.html' }
+              ]
+            ]
+          };
           mainKeyboard.inline_keyboard = updatedMainKeyboard.inline_keyboard;
         }
       });
     } else if (data === 'product_availability_command') {
-      const isSubscribed = await isUserSubscribed(userId, true); // فرض التحديث هنا
+      const isSubscribed = await isUserSubscribed(userId);
       if (!isSubscribed) {
         bot.sendMessage(chatId, '⚠️ هذا الخيار متاح للمشتركين فقط.\n يرجى الاشتراك للوصول إلى هذه الميزة.');
         return;
@@ -372,8 +414,6 @@ bot.onText(/\/start/, async (msg) => {
       });
     } else if (data === 'start') {
       activeUsers.delete(userId);
-      const isSubscribed = await isUserSubscribed(userId, true); // فرض التحديث هنا
-      const mainKeyboard = getMainKeyboard(isSubscribed);
       updateMessage(welcomeMessage, mainKeyboard, msg);
     }
   });
@@ -399,11 +439,6 @@ bot.onText(/\/start/, async (msg) => {
             reply_markup: notificationChannelsKeyboard,
             parse_mode: 'Markdown'
           });
-
-          // تحديث حالة الاشتراك بعد التفعيل
-          const isSubscribed = await isUserSubscribed(userId, true); // فرض التحديث هنا
-          const mainKeyboard = getMainKeyboard(isSubscribed);
-          updateMessage(welcomeMessage, mainKeyboard, { chat: { id: chatId }, message_id: msg.message_id });
         }
       };
 
@@ -415,33 +450,6 @@ bot.onText(/\/start/, async (msg) => {
     }
   });
 });
-
-function getMainKeyboard(isSubscribed) {
-  return {
-    inline_keyboard: [
-      isSubscribed ? [
-        { text: 'وقت توفر المنتجات ⏰', callback_data: 'product_availability_command' }
-      ] : [],
-      isSubscribed ? [
-        { text: 'قنوات التنبيهات 🔔', callback_data: 'notification_channels_command' },
-        { text: 'تفعيل الاشتراك 🔑', callback_data: 'activate_subscription_command' }
-      ] : [
-        { text: 'تجربة مجانية 🎁', callback_data: 'free_trial_command' },
-        { text: 'تفعيل الاشتراك 🔑', callback_data: 'activate_subscription_command' }
-      ],
-      isSubscribed ? [
-        { text: 'الدعم الفني 📩', url: 'https://t.me/MZZ_2' },
-        { text: 'حالة الاشتراك 📊', callback_data: 'subscription_status_command' }
-      ] : [
-        { text: 'الدعم الفني 📩', url: 'https://t.me/MZZ_2' },
-        { text: 'القروب العام 📢', url: 'https://t.me/+hrIusgChjeMwY2Zk' }
-      ],
-      [
-        { text: 'رابط المتجر 🛒', url: 'http://www.dzrtgg.com/' }
-      ]
-    ]
-  };
-}
 
 // الحصول على حالة الاشتراك
 async function getSubscriptionStatus(userId, callback) {
@@ -501,7 +509,7 @@ async function handleFreeTrial(userId, callback) {
 
       if (user.trial_used) {
         await connection.rollback();
-        callback('لقد استخدمت التجربة المجانية مسبقًا ⚠️.\n\nبامكانك الاشتراك من هنا:\n[رابط المتجر] او الضغط على زر المتجر👇🏻\n\n http://www.dzrtgg.com/', false);
+        callback('لقد استخدمت التجربة المجانية مسبقًا ⚠️.\n\nبامكانك الاشتراك من هنا:\n[رابط المتجر] او الضغط على زر المتجر👇🏻\n\n https://www.dzrt.com/ar/our-products.html', false);
       } else if (user.activated) {
         await connection.rollback();
         callback('لديك اشتراك نشط حاليًا ⚠️.', false);
