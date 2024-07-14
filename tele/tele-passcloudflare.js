@@ -60,7 +60,7 @@ async function checkProductAvailability(url) {
 
       if (!isUnavailable && (currentTime - productStatus[url].individualCooldownTime > productCooldown)) {
         // المنتج متوفر الآن وفترة التهدئة الفردية قد انقضت
-        const message = `*${productNameAr}* - متوفر الآن ✅ \n[ أضغط هنا - اضافة الى السلة ](${url})`;
+        const message = `*${productNameAr}* - متوفر الآن ✅ \n[  الرابط - اضافة الى السلة ](${url})`;
         const sentMessage = await bot.sendPhoto(chatId, imageUrl, { caption: message, parse_mode: 'Markdown' });
         
         productStatus[url] = {
