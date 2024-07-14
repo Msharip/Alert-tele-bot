@@ -28,103 +28,6 @@ const rateLimiter = new RateLimiterMemory({
   duration: 10, // مدة الصلاحية للنقاط بالثواني
 });
 
-// تفعيل اشتراك المستخدم
-async function activateUserSubscription(userId, code, duration, callback) {
-  let connection;
-  try {
-    connection = await pool.getConnection();
-    await connection.beginTransaction();
-
-    const [existingUsers] = await connection.execute('SELECT * FROM users WHERE id = ?', [userId]);
-  
-    const user = existingUsers.length > 0 ? existingUsers[0] : null;
-
-    if (user) {
-      await extendUserSubscription(connection, userId, code, duration, callback);
-    } else {
-      const startDate = new Date().toISOString().split('T')[0];
-      let expiryDate = new Date();
-      if (duration < 0) {
-        expiryDate.setDate(expiryDate.getDate() - duration);
-      } else {
-        expiryDate.setMonth(expiryDate.getMonth() + duration);
-      }
-
-      const insertQuery = `
-        INSERT INTO users (id, activated, subscriptionType, startDate, expiryDate)
-        VALUES (?, ?, ?, ?, ?)
-      `;
-      await connection.execute(insertQuery, [userId, true, `${Math.abs(duration)} ${duration < 0 ? 'يوم' : 'أشهر'}`, startDate, expiryDate.toISOString().split('T')[0]]);
-      await deleteActivationCode(connection, code);
-      await connection.commit();
-      callback(`**تم تفعيل اشتراكك بنجاح لمدة ${Math.abs(duration)} ${duration < 0 ? 'يوم' : 'أشهر'}.** 🎉`);
-    }
-
-    await connection.execute('UPDATE users SET activated = true WHERE id = ?', [userId]);
-    userSubscriptions.set(userId, true); // تحديث حالة الاشتراك
-  } catch (err) {
-    if (connection) await connection.rollback();
-    console.error('Error activating subscription:', err);
-    callback('⚠️ حدث خطأ أثناء تفعيل الاشتراك.');
-  } finally {
-    if (connection) connection.release();
-  }
-}
-
-// تمديد اشتراك المستخدم
-async function extendUserSubscription(connection, userId, code, duration, callback) {
-  try {
-    const [existingUsers] = await connection.execute('SELECT * FROM users WHERE id = ?', [userId]);
-    const user = existingUsers.length > 0 ? existingUsers[0] : null;
-
-    if (!user) {
-      callback('ليس لديك اشتراك حاليًا ⚠️');
-      return;
-    }
-
-    let expiryDate = new Date(user.expiryDate);
-    let totalDuration = '';
-
-    if (user.subscriptionType.includes('يوم')) {
-      if (duration > 0) {
-        expiryDate = new Date();
-        expiryDate.setMonth(expiryDate.getMonth() + duration);
-        totalDuration = `${duration} أشهر`;
-      } else {
-        expiryDate.setDate(expiryDate.getDate() - duration);
-        const totalDays = user.subscriptionType.match(/\d+/) ? parseInt(user.subscriptionType.match(/\d+/)[0]) - duration : Math.abs(duration);
-        totalDuration = `${totalDays} يوم`;
-      }
-    } else {
-      if (duration < 0) {
-        expiryDate.setDate(expiryDate.getDate() - duration);
-        const totalMonths = user.subscriptionType.match(/\d+/) ? parseInt(user.subscriptionType.match(/\d+/)[0]) + Math.floor(duration / 30) : Math.abs(duration);
-        totalDuration = `${totalMonths} أشهر`;
-      } else {
-        expiryDate.setMonth(expiryDate.getMonth() + duration);
-        const totalMonths = user.subscriptionType.match(/\d+/) ? parseInt(user.subscriptionType.match(/\d+/)[0]) + duration : duration;
-        totalDuration = `${totalMonths} أشهر`;
-      }
-    }
-
-    const updateQuery = `
-      UPDATE users SET expiryDate = ?, subscriptionType = ? WHERE id = ?
-    `;
-    await connection.execute(updateQuery, [expiryDate.toISOString().split('T')[0], totalDuration, userId]);
-    await deleteActivationCode(connection, code);
-    await connection.commit();
-    callback(`**تم تمديد اشتراكك بنجاح لمدة ${Math.abs(duration)} ${duration < 0 ? 'يوم' : 'أشهر'}.**\n\n الآن مجموع الاشتراك هو ${totalDuration} 🎉`);
-  } catch (err) {
-    console.error('Error extending subscription:', err);
-    callback('⚠️ حدث خطأ أثناء تمديد الاشتراك.');
-  }
-}
-
-// حذف كود التفعيل
-async function deleteActivationCode(connection, code) {
-  const deleteQuery = 'DELETE FROM activationcodes WHERE activation_code = ?';
-  await connection.execute(deleteQuery, [code]);
-}
 // دالة للتحقق من حالة الاشتراك مع مدة صلاحية
 async function isUserSubscribed(userId) {
   // إذا كانت حالة الاشتراك مخزنة وصالحة، قم بإعادتها مباشرة
@@ -456,39 +359,6 @@ bot.onText(/\/start/, async (msg) => {
   });
 });
 
-bot.on('message', async (msg) => {
-  const userId = msg.from.id;
-  const chatId = msg.chat.id;
-
-  if (activeUsers.has(userId) && (activeUsers.get(userId) === 'activating' || activeUsers.get(userId) === 'extending')) {
-    const code = msg.text.trim();
-    const action = activeUsers.get(userId);
-    activeUsers.delete(userId);
-
-    const callback = async (res) => {
-      await bot.sendMessage(chatId, res, { parse_mode: 'Markdown' });
-
-      if (!res.includes('⚠️')) {
-        const fullResponse = `
-اختر قناة المنتجات التي ترغب بها🔔
-\n\n\n
-واستمتع باسرع اشعارات لمنتجاتك المخصصة:
-`;
-        await bot.sendMessage(chatId, fullResponse, {
-          reply_markup: notificationChannelsKeyboard,
-          parse_mode: 'Markdown'
-        });
-      }
-    };
-
-    if (action === 'activating') {
-      await activateSubscription(userId, code, callback);
-    } else if (action === 'extending') {
-      await activateSubscription(userId, code, callback);
-    }
-  }
-});
-
 // الحصول على حالة الاشتراك
 async function getSubscriptionStatus(userId, callback) {
   let connection;
@@ -512,6 +382,7 @@ async function getSubscriptionStatus(userId, callback) {
     if (connection) connection.release();
   }
 }
+
 // تفعيل الاشتراك
 async function activateSubscription(userId, code, callback) {
   let connection;
@@ -667,3 +538,16 @@ async function getProductAvailability(callback) {
     if (connection) connection.release();
   }
 }
+
+// دالة لتنظيف البيانات (حذف الاشتراكات المنتهية)
+function cleanUpExpiredSubscriptions() {
+  const now = Date.now(); // الحصول على الوقت الحالي
+  userSubscriptions.forEach((value, key) => {
+    if (value.expiry <= now) {
+      userSubscriptions.delete(key); // حذف الاشتراك المنتهي من الذاكرة المؤقتة
+    }
+  });
+}
+
+// تشغيل الدالة بشكل دوري (كل يوم - 24 ساعة)
+setInterval(cleanUpExpiredSubscriptions, 24 * 60 * 60 * 1000); // 24 ساعة بالمللي ثانية
