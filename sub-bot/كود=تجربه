@@ -125,36 +125,20 @@ async function deleteActivationCode(connection, code) {
   const deleteQuery = 'DELETE FROM activationcodes WHERE activation_code = ?';
   await connection.execute(deleteQuery, [code]);
 }
-// دالة للتحقق من حالة الاشتراك مع مدة صلاحية
+
+// دالة للتحقق من حالة الاشتراك
 async function isUserSubscribed(userId) {
-  // إذا كانت حالة الاشتراك مخزنة وصالحة، قم بإعادتها مباشرة
   if (userSubscriptions.has(userId)) {
-    const { isSubscribed, expiry } = userSubscriptions.get(userId);
-    if (expiry > Date.now()) {
-      return isSubscribed;
-    }
+    return userSubscriptions.get(userId);
   }
 
-  // تحقق من قاعدة البيانات إذا لم تكن الحالة مخزنة أو منتهية
   let connection;
   try {
     connection = await pool.getConnection();
     const [results] = await connection.execute('SELECT activated, expiryDate FROM users WHERE id = ?', [userId]);
-
-    if (results.length > 0) {
-      const user = results[0];
-      const currentDateTime = new Date();
-      const expiryDateTime = new Date(user.expiryDate);
-
-      // تحقق مما إذا كان الاشتراك ما زال ساريًا
-      const isSubscribed = user.activated === 1 && expiryDateTime > currentDateTime;
-      userSubscriptions.set(userId, { isSubscribed, expiry: expiryDateTime.getTime() }); // تحديث حالة الاشتراك في الذاكرة المؤقتة مع وقت انتهاء
-
-      return isSubscribed;
-    } else {
-      userSubscriptions.set(userId, { isSubscribed: false, expiry: Date.now() }); // إذا لم يكن هناك سجل للمستخدم
-      return false;
-    }
+    const isSubscribed = results.length > 0 && results[0].activated === 1 && new Date(results[0].expiryDate) > new Date();
+    userSubscriptions.set(userId, isSubscribed); // تخزين حالة الاشتراك مؤقتًا
+    return isSubscribed;
   } catch (err) {
     console.error('Error checking subscription status:', err);
     return false;
@@ -512,6 +496,7 @@ async function getSubscriptionStatus(userId, callback) {
     if (connection) connection.release();
   }
 }
+
 // تفعيل الاشتراك
 async function activateSubscription(userId, code, callback) {
   let connection;
@@ -520,20 +505,7 @@ async function activateSubscription(userId, code, callback) {
     const [results] = await connection.execute('SELECT * FROM activationcodes WHERE activation_code = ?', [code]);
     if (results.length > 0) {
       const duration = results[0].duration_in_months;
-      await activateUserSubscription(userId, code, duration, async (message) => {
-        await callback(message);
-        
-        // حذف الرسائل السابقة بعد تفعيل الاشتراك بنجاح
-        if (userMessagesMap.has(userId)) {
-          const previousMessages = userMessagesMap.get(userId);
-          previousMessages.forEach(messageId => {
-            bot.deleteMessage(userId, messageId).catch((error) => {
-              console.error('Error deleting previous message:', error);
-            });
-          });
-          userMessagesMap.delete(userId);
-        }
-      });
+      await activateUserSubscription(userId, code, duration, callback);
     } else {
       callback('الرمز غير صالح⚠️');
     }
@@ -569,14 +541,11 @@ async function handleFreeTrial(userId, callback) {
         await connection.rollback();
         callback('لقد تم استخدام جميع الاشتراكات التجريبية المجانية لهذا اليوم ⚠️.', false);
       } else {
-        const expiryDateTime = await activateFreeTrial(userId, connection);
+        await activateFreeTrial(userId, connection);
         await connection.execute('UPDATE trial_usage SET count = count + 1 WHERE id = 1');
         await connection.commit();
-        userSubscriptions.set(userId, { isSubscribed: true, expiry: expiryDateTime.getTime() }); // تحديث حالة الاشتراك بعد تفعيل التجربة المجانية بنجاح
+        userSubscriptions.set(userId, true); // تحديث حالة الاشتراك بعد تفعيل التجربة المجانية بنجاح
         callback('تم تفعيل الاشتراك التجريبي المجاني ليوم واحد 🎉\n\n\n\nاختر القنوات التي تريد الانضمام لها', true);
-
-        // إعادة إرسال رسالة /start بعد التفعيل لضمان تحديث القائمة
-        bot.sendMessage(userId, '/start');
       }
     } else {
       const [trialCountResult] = await connection.execute('SELECT count FROM trial_usage WHERE id = 1 FOR UPDATE');
@@ -586,10 +555,10 @@ async function handleFreeTrial(userId, callback) {
         await connection.rollback();
         callback('لقد تم استخدام جميع الاشتراكات التجريبية المجانية لهذا اليوم ⚠️.\n\n يوميا الساعه 12 ظهرا سيتم اعادة تعيين التجربة الى اول 20 شخص', false);
       } else {
-        const expiryDateTime = await activateFreeTrial(userId, connection);
+        await activateFreeTrial(userId, connection);
         await connection.execute('UPDATE trial_usage SET count = count + 1 WHERE id = 1');
         await connection.commit();
-        userSubscriptions.set(userId, { isSubscribed: true, expiry: expiryDateTime.getTime() }); // تحديث حالة الاشتراك بعد تفعيل التجربة المجانية بنجاح
+        userSubscriptions.set(userId, true); // تحديث حالة الاشتراك بعد تفعيل التجربة المجانية بنجاح
         callback('تم تفعيل الاشتراك التجريبي المجاني ليوم واحد 🎉\n\n\n\nاختر القنوات التي تريد الانضمام لها', true);
       }
     }
@@ -614,8 +583,6 @@ async function activateFreeTrial(userId, connection) {
     ON DUPLICATE KEY UPDATE activated = VALUES(activated), subscriptionType = VALUES(subscriptionType), startDate = VALUES(startDate), expiryDate = VALUES(expiryDate), trial_used = VALUES(trial_used)
   `;
   await connection.execute(insertOrUpdateQuery, [userId, true, '1 يوم', startDate, expiryDate.toISOString().split('T')[0], true]);
-
-  return expiryDate; // إرجاع تاريخ الانتهاء لاستخدامه في التحديث
 }
 
 // جدولة إعادة تعيين العداد عند الساعة 12 ظهرًا
