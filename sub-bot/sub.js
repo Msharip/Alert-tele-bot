@@ -146,7 +146,6 @@ async function isUserSubscribed(userId) {
     if (connection) connection.release();
   }
 }
-
 const notificationChannelsKeyboard = {
   inline_keyboard: [
     [
@@ -224,32 +223,8 @@ bot.onText(/\/start/, async (msg) => {
   }
 
   const isSubscribed = await isUserSubscribed(userId);
-  const mainKeyboard = {
-    inline_keyboard: [
-      isSubscribed ? [
-        { text: 'وقت توفر المنتجات ⏰', callback_data: 'product_availability_command' }
-      ] : [],
-      isSubscribed ? [
-        { text: 'قنوات التنبيهات 🔔', callback_data: 'notification_channels_command' },
-        { text: 'تفعيل الاشتراك 🔑', callback_data: 'activate_subscription_command' }
-      ] : [
-        { text: 'تجربة مجانية 🎁', callback_data: 'free_trial_command' },
-        { text: 'تفعيل الاشتراك 🔑', callback_data: 'activate_subscription_command' }
-      ],
-      isSubscribed ? [
-        { text: 'الدعم الفني 📩', url: 'https://t.me/MZZ_2' },
-        { text: 'حالة الاشتراك 📊', callback_data: 'subscription_status_command' }
-      ] : [
-        { text: 'الدعم الفني 📩', url: 'https://t.me/MZZ_2' },
-        { text: 'القروب العام 📢', url: 'https://t.me/+hrIusgChjeMwY2Zk' }
-      ],
-      [
-        { text: 'رابط المتجر 🛒', url: 'https://www.dzrt.com/ar/our-products.html' }
-      ]
-    ]
-  };
+  const mainKeyboard = getMainKeyboard(isSubscribed);
   
-
   const welcomeMessage = `
 ⚡ **انضم إلى البوت الأسرع والأكثر تقدمًا** ⚡
 
@@ -374,24 +349,7 @@ bot.onText(/\/start/, async (msg) => {
 
         // إذا تم تفعيل التجربة المجانية، قم بتحديث لوحة المفاتيح الرئيسية
         if (showChannelsButton) {
-          const updatedMainKeyboard = {
-            inline_keyboard: [
-              [
-                { text: 'وقت توفر المنتجات ⏰', callback_data: 'product_availability_command' }
-              ],
-              [
-                { text: 'قنوات التنبيهات 🔔', callback_data: 'notification_channels_command' },
-                { text: 'تفعيل الاشتراك 🔑', callback_data: 'activate_subscription_command' },
-              ],
-              [
-                { text: 'الدعم الفني 📩', url: 'https://t.me/MZZ_2' },
-                { text: 'حالة الاشتراك 📊', callback_data: 'subscription_status_command' }
-              ],
-              [
-                { text: 'رابط المتجر 🛒', url: 'https://www.dzrt.com/ar/our-products.html' }
-              ]
-            ]
-          };
+          const updatedMainKeyboard = getMainKeyboard(true);
           mainKeyboard.inline_keyboard = updatedMainKeyboard.inline_keyboard;
         }
       });
@@ -414,6 +372,8 @@ bot.onText(/\/start/, async (msg) => {
       });
     } else if (data === 'start') {
       activeUsers.delete(userId);
+      const isSubscribed = await isUserSubscribed(userId);
+      const mainKeyboard = getMainKeyboard(isSubscribed);
       updateMessage(welcomeMessage, mainKeyboard, msg);
     }
   });
@@ -450,6 +410,33 @@ bot.onText(/\/start/, async (msg) => {
     }
   });
 });
+
+function getMainKeyboard(isSubscribed) {
+  return {
+    inline_keyboard: [
+      isSubscribed ? [
+        { text: 'وقت توفر المنتجات ⏰', callback_data: 'product_availability_command' }
+      ] : [],
+      isSubscribed ? [
+        { text: 'قنوات التنبيهات 🔔', callback_data: 'notification_channels_command' },
+        { text: 'تفعيل الاشتراك 🔑', callback_data: 'activate_subscription_command' }
+      ] : [
+        { text: 'تجربة مجانية 🎁', callback_data: 'free_trial_command' },
+        { text: 'تفعيل الاشتراك 🔑', callback_data: 'activate_subscription_command' }
+      ],
+      isSubscribed ? [
+        { text: 'الدعم الفني 📩', url: 'https://t.me/MZZ_2' },
+        { text: 'حالة الاشتراك 📊', callback_data: 'subscription_status_command' }
+      ] : [
+        { text: 'الدعم الفني 📩', url: 'https://t.me/MZZ_2' },
+        { text: 'القروب العام 📢', url: 'https://t.me/+hrIusgChjeMwY2Zk' }
+      ],
+      [
+        { text: 'رابط المتجر 🛒', url: 'https://www.dzrt.com/ar/our-products.html' }
+      ]
+    ]
+  };
+}
 
 // الحصول على حالة الاشتراك
 async function getSubscriptionStatus(userId, callback) {
@@ -609,5 +596,3 @@ async function getProductAvailability(callback) {
     if (connection) connection.release();
   }
 }
-
-
