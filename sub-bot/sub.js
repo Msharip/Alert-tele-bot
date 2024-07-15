@@ -57,7 +57,8 @@ async function activateUserSubscription(userId, code, duration, callback) {
     }
 
     await connection.execute('UPDATE users SET activated = true WHERE id = ?', [userId]);
-    userSubscriptions.set(userId, true); // تحديث حالة الاشتراك
+    userSubscriptions.set(userId, true); // تحديث حالة الاشتراك في الذاكرة المؤقتة
+    cache.set(userId, true); // تحديث التخزين المؤقت
   } catch (err) {
     if (connection) await connection.rollback();
     console.error('Error activating subscription:', err);
@@ -110,6 +111,7 @@ async function extendUserSubscription(connection, userId, code, duration, callba
     await deleteActivationCode(connection, code);
     await connection.commit();
     callback(`**تم تمديد اشتراكك بنجاح لمدة ${Math.abs(duration)} ${duration < 0 ? 'يوم' : 'أشهر'}.**\n\n الآن مجموع الاشتراك هو ${totalDuration} 🎉`);
+    cache.set(userId, true); // تحديث التخزين المؤقت
   } catch (err) {
     console.error('Error extending subscription:', err);
     callback('⚠️ حدث خطأ أثناء تمديد الاشتراك.');
@@ -120,6 +122,7 @@ async function deleteActivationCode(connection, code) {
   const deleteQuery = 'DELETE FROM activationcodes WHERE activation_code = ?';
   await connection.execute(deleteQuery, [code]);
 }
+
 //const cache = new NodeCache({ stdTTL: 3600 }); // مدة التخزين المؤقت ساعة واحدة (3600 ثانية)
 const cache = new NodeCache({ stdTTL: 600 }); // مدة التخزين المؤقت 10 دقائق (600 ثانية)
 
@@ -537,9 +540,11 @@ async function handleFreeTrial(userId, callback) {
         const expiryDateTime = await activateFreeTrial(userId, connection);
         await connection.execute('UPDATE trial_usage SET count = count + 1 WHERE id = 1');
         await connection.commit();
-        userSubscriptions.set(userId, { isSubscribed: true, expiry: expiryDateTime.getTime() }); // تحديث حالة الاشتراك بعد تفعيل التجربة المجانية بنجاح
+        userSubscriptions.set(userId, true); // تحديث حالة الاشتراك في الذاكرة المؤقتة
+        cache.set(userId, true); // تحديث التخزين المؤقت
         callback('تم تفعيل الاشتراك التجريبي المجاني ليوم واحد 🎉\n\n\n\nاختر القنوات التي تريد الانضمام لها', true);
         // إعادة إرسال رسالة /start بعد التفعيل لضمان تحديث القائمة
+        //bot.sendMessage(userId, '/start');
       }
     } else {
       const [trialCountResult] = await connection.execute('SELECT count FROM trial_usage WHERE id = 1 FOR UPDATE');
@@ -551,7 +556,8 @@ async function handleFreeTrial(userId, callback) {
         const expiryDateTime = await activateFreeTrial(userId, connection);
         await connection.execute('UPDATE trial_usage SET count = count + 1 WHERE id = 1');
         await connection.commit();
-        userSubscriptions.set(userId, { isSubscribed: true, expiry: expiryDateTime.getTime() }); // تحديث حالة الاشتراك بعد تفعيل التجربة المجانية بنجاح
+        userSubscriptions.set(userId, true); // تحديث حالة الاشتراك في الذاكرة المؤقتة
+        cache.set(userId, true); // تحديث التخزين المؤقت
         callback('تم تفعيل الاشتراك التجريبي المجاني ليوم واحد 🎉\n\n\n\nاختر القنوات التي تريد الانضمام لها', true);
       }
     }
@@ -563,6 +569,7 @@ async function handleFreeTrial(userId, callback) {
     if (connection) connection.release();
   }
 }
+
 // تفعيل التجربة المجانية
 async function activateFreeTrial(userId, connection) {
   const startDate = new Date().toISOString().split('T')[0];
