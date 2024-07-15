@@ -1,0 +1,348 @@
+'19', 'https://www.dzrt.com/ar/highland-berries.html', '2024-07-12 14:12:25'
+'23', 'https://www.dzrt.com/ar/highland-berries.html', '2024-07-13 14:31:25'
+'24', 'https://www.dzrt.com/ar/icy-rush.html', '2024-07-13 14:31:46'
+'25', 'https://www.dzrt.com/ar/purple-mist.html', '2024-07-13 14:31:49'
+'26', 'https://www.dzrt.com/ar/seaside-frost.html', '2024-07-13 14:31:53'
+'27', 'https://www.dzrt.com/ar/mint-fusion.html', '2024-07-13 14:32:03'
+'28', 'https://www.dzrt.com/ar/edgy-mint.html', '2024-07-13 14:32:23'
+'29', 'https://www.dzrt.com/ar/garden-mint.html', '2024-07-13 14:32:34'
+'30', 'https://www.dzrt.com/ar/samra.html', '2024-07-13 14:32:42'
+'31', 'https://www.dzrt.com/ar/tamra.html', '2024-07-13 14:32:52'
+'32', 'https://www.dzrt.com/ar/highland-berries.html', '2024-07-14 15:36:43'
+'33', 'https://www.dzrt.com/ar/tamra.html', '2024-07-14 15:45:52'
+
+
+
+
+async function deleteOldNotifications() {
+    const currentDate = new Date();
+    const threeDaysAgo = new Date(currentDate.setDate(currentDate.getDate() - 5)).toISOString().slice(0, 19).replace('T', ' ');
+  
+    let connection;
+    try {
+      connection = await pool.getConnection();
+  
+      // التحقق من وجود إشعارات قديمة
+      const checkQuery = 'SELECT COUNT(*) AS count FROM product_notifications WHERE notification_time < ?';
+      let [rows] = await connection.query(checkQuery, [threeDaysAgo]);
+  
+      if (rows[0].count > 0) {
+        console.log(`Found ${rows[0].count} old notifications to delete.`);
+  
+        // حذف الإشعارات القديمة
+        const deleteQuery = 'DELETE FROM product_notifications WHERE notification_time < ?';
+        let [result] = await connection.query(deleteQuery, [threeDaysAgo]);
+        console.log(`Deleted ${result.affectedRows} old notifications.`);
+  
+        // إعادة التحقق من وجود إشعارات قديمة بعد الحذف
+        [rows] = await connection.query(checkQuery, [threeDaysAgo]);
+        if (rows[0].count > 0) {
+          console.log(`Still found ${rows[0].count} old notifications after deletion.`);
+        } else {
+          console.log('No old notifications found after deletion.');
+        }
+      } else {
+        console.log('No old notifications found to delete.');
+      }
+    } catch (error) {
+      console.error('Error deleting old notifications:', error);
+    } finally {
+      if (connection) {
+        connection.release();
+      }
+    }
+  }
+  
+  cron.schedule('*/40 * * * * *', async () => {
+    console.log("Checking and deleting old notifications...");
+    await deleteOldNotifications();
+  });
+
+
+
+
+
+
+
+
+
+
+  async function deleteOldNotifications() {
+    const currentDate = new Date();
+    const threeDaysAgo = new Date(currentDate.setDate(currentDate.getDate() - 4)).toISOString().slice(0, 19).replace('T', ' ');
+  
+    let connection;
+    try {
+      connection = await pool.getConnection();
+      const query = 'DELETE FROM product_notifications WHERE notification_time < ?';
+      const [result] = await connection.query(query, [threeDaysAgo]);
+      console.log(`Deleted ${result.affectedRows} old notifications.`);
+    } catch (error) {
+      console.error('Error deleting old notifications:', error);
+    } finally {
+      if (connection) {
+        connection.release();
+      }
+    }
+  }
+  
+  // جدولة حذف السجلات القديمة كل 3 أيام في الساعة 8 صباحًا
+  cron.schedule('0 8 */3 * *', () => {
+    deleteOldNotifications();
+  });
+  
+  function delay(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+  }
+  
+  async function getProductAvailability(callback) {
+    let connection;
+    try {
+      connection = await pool.getConnection();
+      const threeDaysAgo = new Date(new Date().setDate(new Date().getDate() - 5)).toISOString().slice(0, 19).replace('T', ' ');
+  
+      // Adjusting the query to get the first notification of each day
+      const [results] = await connection.execute(`
+        SELECT MIN(notification_time) as notification_time 
+        FROM product_notifications 
+        WHERE notification_time >= ? 
+        GROUP BY DATE(notification_time) 
+        ORDER BY notification_time ASC
+      `, [threeDaysAgo]);
+  
+      if (results.length === 0) {
+        callback('لا توجد معلومات متاحة حاليًا حول توفر المنتجات. ⚠️');
+        return;
+      }
+  
+      let response = `** وقت أول إشعار للخمس ايام السابقة :**\n\n`;
+      results.forEach((row, index) => {
+        const notificationTime = new Date(row.notification_time);
+        const dayName = notificationTime.toLocaleDateString('ar-SA', { weekday: 'long' });
+        const formattedTime = notificationTime.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
+        response += `\n ${dayName} - ${formattedTime} 🕒\n`;
+      });
+  
+      callback(response);
+    } catch (err) {
+      console.error('Error getting product availability:', err);
+      callback('⚠️ حدث خطأ أثناء الحصول على معلومات توفر المنتجات.');
+    } finally {
+      if (connection) connection.release();
+    }
+  }
+  
+  // دالة لتنظيف البيانات (حذف الاشتراكات المنتهية)
+  function cleanUpExpiredSubscriptions() {
+    const now = Date.now(); // الحصول على الوقت الحالي
+    userSubscriptions.forEach((value, key) => {
+      if (value.expiry <= now) {
+        userSubscriptions.delete(key); // حذف الاشتراك المنتهي من الذاكرة المؤقتة
+      }
+    });
+  }
+  
+  // استخدام cron لتشغيل الدالة كل يوم عند الساعة 5 بعد منتصف الليل
+  cron.schedule('0 5 * * *', () => {
+    cleanUpExpiredSubscriptions();
+  });
+
+
+
+
+
+  
+
+  const isSubscribed = await isUserSubscribed(userId);
+  const mainKeyboard = isSubscribed ? getMainKeyboardForSubscribed() : getMainKeyboardForUnsubscribed();
+
+
+
+
+
+  // إعداد التخزين المؤقت
+const cache = new NodeCache({ stdTTL: 3600 }); // مدة التخزين المؤقت ساعة واحدة (3600 ثانية)
+
+// دالة للتحقق من حالة الاشتراك مع مدة صلاحية
+async function isUserSubscribed(userId) {
+  // تحقق من التخزين المؤقت أولاً
+  const cachedSubscription = cache.get(`subscription_${userId}`);
+  if (cachedSubscription !== undefined) {
+    return cachedSubscription.isSubscribed;
+  }
+  // تحقق من قاعدة البيانات إذا لم تكن الحالة مخزنة
+  let connection;
+  try {
+    connection = await pool.getConnection();
+    const [results] = await connection.execute('SELECT activated FROM users WHERE id = ?', [userId]);
+
+    if (results.length > 0) {
+      const user = results[0];
+
+      // تحقق مما إذا كان الاشتراك ما زال ساريًا
+      const isSubscribed = user.activated === 1;
+      cache.set(`subscription_${userId}`, { isSubscribed }); // تحديث حالة الاشتراك في التخزين المؤقت
+
+      return isSubscribed;
+    } else {
+      cache.set(`subscription_${userId}`, { isSubscribed: false }); // إذا لم يكن هناك سجل للمستخدم
+      return false;
+    }
+  } catch (err) {
+    console.error('Error checking subscription status:', err);
+    return false;
+  } finally {
+    if (connection) connection.release();
+  }
+}
+
+
+
+
+
+
+// إعداد التخزين المؤقت
+const cache = new NodeCache({ stdTTL: 3600 }); // مدة التخزين المؤقت ساعة واحدة (3600 ثانية)
+
+// دالة للتحقق من حالة الاشتراك مع مدة صلاحية
+async function isUserSubscribed(userId) {
+  // تحقق من التخزين المؤقت أولاً
+  const cachedSubscription = cache.get(`subscription_${userId}`);
+  if (cachedSubscription !== undefined) {
+    if (cachedSubscription.expiry < Date.now()) {
+      cache.del(`subscription_${userId}`);
+      return false;
+    }
+    return cachedSubscription.isSubscribed;
+  }
+
+  // تحقق من قاعدة البيانات إذا لم تكن الحالة مخزنة أو منتهية
+  let connection;
+  try {
+    connection = await pool.getConnection();
+    const [results] = await connection.execute('SELECT activated, expiryDate FROM users WHERE id = ?', [userId]);
+
+    if (results.length > 0) {
+      const user = results[0];
+      const currentDateTime = new Date();
+      const expiryDateTime = new Date(user.expiryDate);
+
+      // تحقق مما إذا كان الاشتراك ما زال ساريًا
+      const isSubscribed = user.activated === 1 && expiryDateTime > currentDateTime;
+      cache.set(`subscription_${userId}`, { isSubscribed, expiry: expiryDateTime.getTime() }); // تحديث حالة الاشتراك في التخزين المؤقت مع وقت انتهاء
+
+      return isSubscribed;
+    } else {
+      cache.set(`subscription_${userId}`, { isSubscribed: false, expiry: Date.now() }); // إذا لم يكن هناك سجل للمستخدم
+      return false;
+    }
+  } catch (err) {
+    console.error('Error checking subscription status:', err);
+    return false;
+  } finally {
+    if (connection) connection.release();
+  }
+}
+
+
+
+
+
+
+// تفعيل اشتراك المستخدم
+async function activateUserSubscription(userId, code, duration, callback) {
+  let connection;
+  try {
+    connection = await pool.getConnection();
+    await connection.beginTransaction();
+
+    const [existingUsers] = await connection.execute('SELECT * FROM users WHERE id = ?', [userId]);
+
+    const user = existingUsers.length > 0 ? existingUsers[0] : null;
+
+    if (user) {
+      await extendUserSubscription(connection, userId, code, duration, callback);
+    } else {
+      const startDate = new Date().toISOString().split('T')[0];
+      let expiryDate = new Date();
+      if (duration < 0) {
+        expiryDate.setDate(expiryDate.getDate() - duration);
+      } else {
+        expiryDate.setMonth(expiryDate.getMonth() + duration);
+      }
+
+      const insertQuery = `
+        INSERT INTO users (id, activated, subscriptionType, startDate, expiryDate)
+        VALUES (?, ?, ?, ?, ?)
+      `;
+      await connection.execute(insertQuery, [userId, true, `${Math.abs(duration)} ${duration < 0 ? 'يوم' : 'أشهر'}`, startDate, expiryDate.toISOString().split('T')[0]]);
+      await deleteActivationCode(connection, code);
+      await connection.commit();
+      callback(`**تم تفعيل اشتراكك بنجاح لمدة ${Math.abs(duration)} ${duration < 0 ? 'يوم' : 'أشهر'}.** 🎉`);
+    }
+
+    await connection.execute('UPDATE users SET activated = true WHERE id = ?', [userId]);
+    userSubscriptions.set(userId, true); // تحديث حالة الاشتراك
+  } catch (err) {
+    if (connection) await connection.rollback();
+    console.error('Error activating subscription:', err);
+    callback('⚠️ حدث خطأ أثناء تفعيل الاشتراك.');
+  } finally {
+    if (connection) connection.release();
+  }
+}
+
+// تمديد اشتراك المستخدم
+async function extendUserSubscription(connection, userId, code, duration, callback) {
+  try {
+    const [existingUsers] = await connection.execute('SELECT * FROM users WHERE id = ?', [userId]);
+    const user = existingUsers.length > 0 ? existingUsers[0] : null;
+
+    if (!user) {
+      callback('ليس لديك اشتراك حاليًا ⚠️');
+      return;
+    }
+
+    let expiryDate = new Date(user.expiryDate);
+    let totalDuration = '';
+
+    if (user.subscriptionType.includes('يوم')) {
+      if (duration > 0) {
+        expiryDate = new Date();
+        expiryDate.setMonth(expiryDate.getMonth() + duration);
+        totalDuration = `${duration} أشهر`;
+      } else {
+        expiryDate.setDate(expiryDate.getDate() - duration);
+        const totalDays = user.subscriptionType.match(/\d+/) ? parseInt(user.subscriptionType.match(/\d+/)[0]) - duration : Math.abs(duration);
+        totalDuration = `${totalDays} يوم`;
+      }
+    } else {
+      if (duration < 0) {
+        expiryDate.setDate(expiryDate.getDate() - duration);
+        const totalMonths = user.subscriptionType.match(/\d+/) ? parseInt(user.subscriptionType.match(/\d+/)[0]) + Math.floor(duration / 30) : Math.abs(duration);
+        totalDuration = `${totalMonths} أشهر`;
+      } else {
+        expiryDate.setMonth(expiryDate.getMonth() + duration);
+        const totalMonths = user.subscriptionType.match(/\d+/) ? parseInt(user.subscriptionType.match(/\d+/)[0]) + duration : duration;
+        totalDuration = `${totalMonths} أشهر`;
+      }
+    }
+
+    const updateQuery = `
+      UPDATE users SET expiryDate = ?, subscriptionType = ? WHERE id = ?
+    `;
+    await connection.execute(updateQuery, [expiryDate.toISOString().split('T')[0], totalDuration, userId]);
+    await deleteActivationCode(connection, code);
+    await connection.commit();
+    callback(`**تم تمديد اشتراكك بنجاح لمدة ${Math.abs(duration)} ${duration < 0 ? 'يوم' : 'أشهر'}.**\n\n الآن مجموع الاشتراك هو ${totalDuration} 🎉`);
+  } catch (err) {
+    console.error('Error extending subscription:', err);
+    callback('⚠️ حدث خطأ أثناء تمديد الاشتراك.');
+  }
+}
+
+// حذف كود التفعيل
+async function deleteActivationCode(connection, code) {
+  const deleteQuery = 'DELETE FROM activationcodes WHERE activation_code = ?';
+  await connection.execute(deleteQuery, [code]);
+}

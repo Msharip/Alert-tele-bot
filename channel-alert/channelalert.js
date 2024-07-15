@@ -5,8 +5,12 @@ const cron = require('node-cron');
 const path = require('path');
 const mysql = require('mysql2/promise');
 const moment = require('moment-timezone');
-
 require('dotenv').config();
+
+// تعريف وظيفة delay في بداية الكود
+function delay(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
 
 const productNames = {
   'https://www.dzrt.com/ar/icy-rush.html': { ar: 'آيسي رش', en: 'icy-rush' },
@@ -191,9 +195,10 @@ const dbConfig = {
   database: process.env.DB_DATABASE,
   port: process.env.DB_PORT
 };
-
 // إنشاء مجموعة من الاتصالات
 const pool = mysql.createPool(dbConfig);
+const BATCH_SIZE = 50;
+const DELAY_BETWEEN_BATCHES = 5000; // 5 seconds delay between batches
 
 async function checkUserSubscriptions() {
   const currentDate = new Date().toISOString().split('T')[0];
@@ -205,27 +210,34 @@ async function checkUserSubscriptions() {
     const [results] = await connection.query(query);
     const usersToUnban = results.filter(user => new Date(user.expiryDate) < new Date(currentDate));
 
-    for (const user of usersToUnban) {
-      const channelIds = [
-        process.env.CHAT_ID_MAIN,
-        process.env.CHAT_ID_ICY_RUSH,
-        process.env.CHAT_ID_SEASIDE,
-        process.env.CHAT_ID_SAMRA,
-        process.env.CHAT_ID_HIGH,
-        process.env.CHAT_ID_GARDEN,
-        process.env.CHAT_ID_MINT,
-        process.env.CHAT_ID_HAILA,
-        process.env.CHAT_ID_PURPPLE,
-        process.env.CHAT_ID_EDGY,
-        process.env.CHAT_ID_TAMRA
-      ];
+    for (let i = 0; i < usersToUnban.length; i += BATCH_SIZE) {
+      const batch = usersToUnban.slice(i, i + BATCH_SIZE);
 
-      try {
-        await unbanUserFromAllChannels(user.id, channelIds);
-        await deactivateUserSubscription(user.id);
-      } catch (error) {
-        console.error(`Failed to process user ${user.id}:`, error);
-      }
+      await Promise.all(batch.map(async (user) => {
+        const channelIds = [
+          process.env.CHAT_ID_MAIN,
+          process.env.CHAT_ID_ICY_RUSH,
+          process.env.CHAT_ID_SEASIDE,
+          process.env.CHAT_ID_SAMRA,
+          process.env.CHAT_ID_HIGH,
+          process.env.CHAT_ID_GARDEN,
+          process.env.CHAT_ID_MINT,
+          process.env.CHAT_ID_HAILA,
+          process.env.CHAT_ID_PURPPLE,
+          process.env.CHAT_ID_EDGY,
+          process.env.CHAT_ID_TAMRA
+        ];
+
+        try {
+          await unbanUserFromAllChannels(user.id, channelIds);
+          await deactivateUserSubscription(user.id);
+        } catch (error) {
+          console.error(`Failed to process user ${user.id}:`, error);
+        }
+      }));
+
+      // إضافة تأخير بين الدفعات
+      await delay(DELAY_BETWEEN_BATCHES);
     }
   } catch (err) {
     console.error('Error reading subscriptions from database:', err);
@@ -237,17 +249,16 @@ async function checkUserSubscriptions() {
 }
 
 async function unbanUserFromAllChannels(userId, channelIds) {
-  for (const channelId of channelIds) {
+  await Promise.all(channelIds.map(async (channelId) => {
     if (channelId) {
       try {
         await bot.unbanChatMember(channelId, userId);
-        // إضافة تأخير قدره 1 ثانية بين كل عملية إزالة
-        await delay(1000);
+        await delay(500); // تقليل التأخير بين عمليات الإزالة إلى 500 ميلي ثانية
       } catch (error) {
         console.error(`Failed to unban user ${userId} from channel ${channelId}:`, error);
       }
     }
-  }
+  }));
 }
 
 async function deactivateUserSubscription(userId) {
@@ -314,31 +325,3 @@ bot.on('chat_join_request', (request) => {
 cron.schedule('0 0 * * *', () => {
   checkUserSubscriptions();
 });
-
-async function deleteOldNotifications() {
-  const currentDate = new Date();
-  const threeDaysAgo = new Date(currentDate.setDate(currentDate.getDate() - 3)).toISOString().slice(0, 19).replace('T', ' ');
-
-  let connection;
-  try {
-    connection = await pool.getConnection();
-    const query = 'DELETE FROM product_notifications WHERE notification_time < ?';
-    await connection.query(query, [threeDaysAgo]);
-  } catch (error) {
-    console.error('Error deleting old notifications:', error);
-  } finally {
-    if (connection) {
-      connection.release();
-    }
-  }
-}
-
-// جدولة حذف السجلات القديمة كل 3 أيام في الساعة 8 صباحًا
-cron.schedule('0 8 */3 * *', () => {
-  deleteOldNotifications();
-});
-
-function delay(ms) {
-  return new Promise(resolve => setTimeout(resolve, ms));
-}
-
