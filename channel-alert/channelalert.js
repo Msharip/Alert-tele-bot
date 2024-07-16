@@ -165,6 +165,7 @@ async function checkProductAvailability(url) {
       }
     }
   } catch (error) {
+    console.error(`Error checking product availability for ${url}:`, error);
   }
 }
 
