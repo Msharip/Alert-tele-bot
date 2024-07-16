@@ -9,7 +9,7 @@ require('./channel-alert/channelalert.js');
 
 
 // AXIOS checking
-//require('./tele/tele.js');
+require('./tele/tele.js');
 // CLOUDFLARE - BYPASS
 //require('./tele/tele-passcloudflare.js')
 

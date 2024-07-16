@@ -123,8 +123,8 @@ async function deleteActivationCode(connection, code) {
   await connection.execute(deleteQuery, [code]);
 }
 
-//const cache = new NodeCache({ stdTTL: 3600 }); // مدة التخزين المؤقت ساعة واحدة (3600 ثانية)
-const cache = new NodeCache({ stdTTL: 600 }); // مدة التخزين المؤقت 10 دقائق (600 ثانية)
+//const cache = new NodeCache({ stdTTL: 600 }); // مدة التخزين المؤقت 10 دقائق (600 ثانية)
+const cache = new NodeCache({ stdTTL: 3600 }); // مدة التخزين المؤقت ساعة واحدة (3600 ثانية)
 
 // دالة للتحقق من حالة التفعيل
 async function isUserSubscribed(userId) {
@@ -596,46 +596,21 @@ cron.schedule('0 12 * * *', async () => {
   }
 });
 
-async function deleteOldNotifications() {
-  let connection;
-  try {
-    connection = await pool.getConnection();
-    // استرجاع جميع الإشعارات مرتبة حسب `notification_time` تنازليًا
-    const selectQuery = 'SELECT id FROM product_notifications ORDER BY notification_time DESC';
-    const [rows] = await connection.query(selectQuery);
+const productCache = new NodeCache({ stdTTL: 43200 }); // مدة التخزين المؤقت 43200 ثانية (12 ساعة)
 
-    // إذا كان هناك أكثر من خمسة إشعارات، قم بحذف الأقدم منها
-    if (rows.length > 5) {
-      const idsToDelete = rows.slice(5).map(row => row.id);
-      const deleteQuery = 'DELETE FROM product_notifications WHERE id IN (?)';
-      const [result] = await connection.query(deleteQuery, [idsToDelete]);
-    } else {
-    }
-  } catch (error) {
-  } finally {
-    if (connection) {
-      connection.release();
-    }
-  }
-}
-
-// جدولة حذف السجلات القديمة كل 5 أيام في الساعة 8 صباحًا
-cron.schedule('0 8 */5 * *', () => {
-  deleteOldNotifications();
-});
-
-
-// جدولة حذف السجلات القديمة كل 3 أيام في الساعة 8 صباحًا
-cron.schedule('0 8 */3 * *', () => {
-  deleteOldNotifications();
-});
 async function getProductAvailability(callback) {
+  // تحقق من وجود البيانات في الكاش
+  const cachedData = productCache.get("productAvailability");
+  if (cachedData) {
+    callback(cachedData); // إعادة البيانات المخزنة في الكاش
+    return;
+  }
+
   let connection;
   try {
     connection = await pool.getConnection();
     const fiveDaysAgo = new Date(new Date().setDate(new Date().getDate() - 5)).toISOString().slice(0, 19).replace('T', ' ');
 
-    // Adjusting the query to get the first notification of each day for the last 5 days
     const [results] = await connection.execute(`
       SELECT MIN(notification_time) as notification_time 
       FROM product_notifications 
@@ -657,6 +632,8 @@ async function getProductAvailability(callback) {
       response += `\n ${dayName} - ${formattedTime} 🕒\n`;
     });
 
+    // حفظ النتائج في الكاش
+    productCache.set("productAvailability", response);
     callback(response);
   } catch (err) {
     console.error('Error getting product availability:', err);
