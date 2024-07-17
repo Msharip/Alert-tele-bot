@@ -57,7 +57,7 @@ const bot = new TelegramBot(token, { polling: true });
 
 
 const productCooldown = 14 * 60 * 1000; // فترة التهدئة الفردية (14 دقيقة)
-const unavailableThreshold = 3; // عدد المرات التي يجب أن يكون فيها المنتج غير متوفر قبل إرسال إشعار
+const unavailableThreshold = 4; // عدد المرات التي يجب أن يكون فيها المنتج غير متوفر قبل إرسال إشعار
 let firstNotificationSaved = false; // متغير للتحقق مما إذا تم حفظ أول إشعار أم لا
 
 const productStatus = {};
@@ -176,7 +176,7 @@ async function checkAllUrls() {
   }
 }
 
-cron.schedule('* * * * * *', () => { 
+cron.schedule('* * * * * *', () => {
   const now = new Date();
   const hour = now.getHours();
 
@@ -184,7 +184,6 @@ cron.schedule('* * * * * *', () => {
     checkAllUrls();
   }
 });
-
 
 const dbConfig = {
   host: process.env.DB_HOST,

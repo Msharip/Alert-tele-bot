@@ -191,7 +191,7 @@ const supportAndBackKeyboard = {
   inline_keyboard: [
     [
       { text: 'الدعم الفني 📩', url: 'https://t.me/MZZ_2' },
-      { text: 'رابط المتجر 🛒', url: 'https://www.dzrt.com/ar/our-products.html' }
+      { text: 'رابط المتجر 🛒', url: 'www.dzrtgg.com' }
     ],
     [
       { text: 'رجوع 🔙', callback_data: 'start' }
@@ -245,7 +245,7 @@ bot.onText(/\/start/, async (msg) => {
         { text: 'القروب العام 📢', url: 'https://t.me/+hrIusgChjeMwY2Zk' }
       ],
       [
-        { text: 'رابط المتجر 🛒', url: 'https://www.dzrt.com/ar/our-products.html' }
+        { text: 'رابط المتجر 🛒', url: 'www.dzrtgg.com' }
       ]
     ]
   };
@@ -253,13 +253,15 @@ bot.onText(/\/start/, async (msg) => {
 ⚡ **انضم إلى البوت الأسرع والأكثر تقدمًا** ⚡
 قروب دزرت فوري العام 👇🏻:
 [قروب دزرت فوري](https://t.me/+hrIusgChjeMwY2Zk)
+
 - قم بزيارة متجرنا الآن
 - أكمل عملية الشراء
 - استخدم الرمز لتفعيل الاشتراك
 - وبإمكانك تمديد اشتراكك
 عن طريق زر *حالة الاشتراك*
+
 👇🏻 **انضم الآن وقم بزيارة المتجر والاشتراك!** 👇🏻
-         www.dzrtgg.com
+              www.dzrtgg.com
 `;
   bot.sendMessage(chatId, welcomeMessage, {
     reply_markup: mainKeyboard,
@@ -289,17 +291,19 @@ bot.onText(/\/start/, async (msg) => {
       }
     };
     if (data === 'notification_channels_command') {
-      const notificationChannelsText = `
-⚡ **انضم إلى البوت الأسرع والأكثر تقدمًا** ⚡ 
+      const notificationChannelsText =`
+⚡ **انضم إلى البوت الأسرع والأكثر تقدمًا** ⚡
 قروب دزرت فوري العام 👇🏻:
 [قروب دزرت فوري](https://t.me/+hrIusgChjeMwY2Zk)
+
 - قم بزيارة متجرنا الآن
 - أكمل عملية الشراء
 - استخدم الرمز لتفعيل الاشتراك
 - وبإمكانك تمديد اشتراكك
 عن طريق زر *حالة الاشتراك*
+
 👇🏻 **انضم الآن وقم بزيارة المتجر والاشتراك!** 👇🏻
-[رابط متجر دزرت فوري](https://dzrt.com)
+              www.dzrtgg.com
 `;
       updateMessage(notificationChannelsText, notificationChannelsKeyboard, msg);
     } else if (data === 'activate_subscription_command') {
@@ -417,7 +421,7 @@ bot.onText(/\/start/, async (msg) => {
             { text: 'القروب العام 📢', url: 'https://t.me/+hrIusgChjeMwY2Zk' }
           ],
           [
-            { text: 'رابط المتجر 🛒', url: 'https://www.dzrt.com/ar/our-products.html' }
+            { text: 'رابط المتجر 🛒', url: 'www.dzrtgg.com' }
           ]
         ]
       };
@@ -551,7 +555,7 @@ async function handleFreeTrial(userId, callback) {
       const trialCount = trialCountResult[0].count;
       if (trialCount >= 20) {
         await connection.rollback();
-        callback('لقد تم استخدام جميع الاشتراكات التجريبية المجانية لهذا اليوم ⚠️.\n\n يوميا الساعه 12 ظهرا سيتم اعادة تعيين التجربة الى اول 20 شخص', false);
+        callback('لقد تم استخدام جميع الاشتراكات التجريبية المجانية لهذا اليوم ⚠️.\n\n يوميا الساعه 10 صباحا سيتم اعادة تعيين التجربة الى اول 20 شخص', false);
       } else {
         const expiryDateTime = await activateFreeTrial(userId, connection);
         await connection.execute('UPDATE trial_usage SET count = count + 1 WHERE id = 1');
@@ -583,8 +587,8 @@ async function activateFreeTrial(userId, connection) {
   await connection.execute(insertOrUpdateQuery, [userId, true, '1 يوم', startDate, expiryDate.toISOString().split('T')[0], true]);
   return expiryDate; // إرجاع تاريخ الانتهاء لاستخدامه في التحديث
 }
-// جدولة إعادة تعيين العداد عند الساعة 12 ظهرًا
-cron.schedule('0 12 * * *', async () => {
+// جدولة إعادة تعيين العداد عند الساعة 10 ظهرًا
+cron.schedule('0 10 * * *', async () => {
   let connection;
   try {
     connection = await pool.getConnection();
@@ -612,10 +616,9 @@ async function getProductAvailability(callback) {
     const fiveDaysAgo = new Date(new Date().setDate(new Date().getDate() - 5)).toISOString().slice(0, 19).replace('T', ' ');
 
     const [results] = await connection.execute(`
-      SELECT MIN(notification_time) as notification_time 
+      SELECT notification_time 
       FROM product_notifications 
       WHERE notification_time >= ? 
-      GROUP BY DATE(notification_time) 
       ORDER BY notification_time ASC
     `, [fiveDaysAgo]);
 
@@ -625,11 +628,18 @@ async function getProductAvailability(callback) {
     }
 
     let response = `** وقت أول إشعار للخمس ايام السابقة :**\n\n`;
+    let daysAdded = new Set();
+
     results.forEach((row) => {
       const notificationTime = new Date(row.notification_time);
       const dayName = notificationTime.toLocaleDateString('ar-SA', { weekday: 'long' });
       const formattedTime = notificationTime.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
-      response += `\n ${dayName} - ${formattedTime} 🕒\n`;
+      const formattedDate = notificationTime.toLocaleDateString('en-CA'); // 2024-07-16
+
+      if (!daysAdded.has(dayName)) {
+        response += `${dayName} - ${formattedDate}:\n الوقت : ${formattedTime} 🕒 \n\n`;
+        daysAdded.add(dayName);
+      }
     });
 
     // حفظ النتائج في الكاش
@@ -642,3 +652,27 @@ async function getProductAvailability(callback) {
     if (connection) connection.release();
   }
 }
+
+// وظيفة لحذف الإشعارات القديمة
+async function deleteOldNotifications() {
+  let connection;
+  try {
+    connection = await pool.getConnection();
+    const fiveDaysAgo = new Date(new Date().setDate(new Date().getDate() - 5)).toISOString().slice(0, 19).replace('T', ' ');
+
+    const [result] = await connection.execute(`
+      DELETE FROM product_notifications 
+      WHERE notification_time < ?
+    `, [fiveDaysAgo]);
+
+    console.log(`${result.affectedRows} old notifications deleted.`);
+  } catch (err) {
+    console.error('Error deleting old notifications:', err);
+  } finally {
+    if (connection) connection.release();
+  }
+}
+
+// استدعاء وظيفة حذف الإشعارات القديمة بشكل دوري (كل 24 ساعة)
+setInterval(deleteOldNotifications, 24 * 60 * 60 * 1000);
+
