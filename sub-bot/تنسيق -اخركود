@@ -2,8 +2,8 @@ const TelegramBot = require('node-telegram-bot-api');
 const mysql = require('mysql2/promise');
 const cron = require('node-cron');
 const { RateLimiterMemory } = require('rate-limiter-flexible');
+const NodeCache = require("node-cache");
 require('dotenv').config();
-
 // إعدادات قاعدة البيانات
 const dbConfig = {
   host: process.env.DB_HOST,
@@ -12,17 +12,13 @@ const dbConfig = {
   database: process.env.DB_DATABASE,
   port: process.env.DB_PORT
 };
-
 const token = process.env.TOKEN4;
 const bot = new TelegramBot(token, { polling: true });
-
 const pool = mysql.createPool(dbConfig);
-
 const activeUsers = new Map();
 const userClicks = new Map();
 const rateLimitMap = new Map(); // لتتبع آخر وقت تلقى فيه المستخدم أمر /start
 const userSubscriptions = new Map(); // لتخزين حالة الاشتراك مؤقتًا
-
 const rateLimiter = new RateLimiterMemory({
   points: 5, // عدد النقاط التي يمكن للمستخدم الحصول عليها
   duration: 10, // مدة الصلاحية للنقاط بالثواني
@@ -36,7 +32,7 @@ async function activateUserSubscription(userId, code, duration, callback) {
     await connection.beginTransaction();
 
     const [existingUsers] = await connection.execute('SELECT * FROM users WHERE id = ?', [userId]);
-  
+
     const user = existingUsers.length > 0 ? existingUsers[0] : null;
 
     if (user) {
@@ -61,7 +57,8 @@ async function activateUserSubscription(userId, code, duration, callback) {
     }
 
     await connection.execute('UPDATE users SET activated = true WHERE id = ?', [userId]);
-    userSubscriptions.set(userId, true); // تحديث حالة الاشتراك
+    userSubscriptions.set(userId, true); // تحديث حالة الاشتراك في الذاكرة المؤقتة
+    cache.set(userId, true); // تحديث التخزين المؤقت
   } catch (err) {
     if (connection) await connection.rollback();
     console.error('Error activating subscription:', err);
@@ -114,39 +111,50 @@ async function extendUserSubscription(connection, userId, code, duration, callba
     await deleteActivationCode(connection, code);
     await connection.commit();
     callback(`**تم تمديد اشتراكك بنجاح لمدة ${Math.abs(duration)} ${duration < 0 ? 'يوم' : 'أشهر'}.**\n\n الآن مجموع الاشتراك هو ${totalDuration} 🎉`);
+    cache.set(userId, true); // تحديث التخزين المؤقت
   } catch (err) {
     console.error('Error extending subscription:', err);
     callback('⚠️ حدث خطأ أثناء تمديد الاشتراك.');
   }
 }
-
 // حذف كود التفعيل
 async function deleteActivationCode(connection, code) {
   const deleteQuery = 'DELETE FROM activationcodes WHERE activation_code = ?';
   await connection.execute(deleteQuery, [code]);
 }
 
-// دالة للتحقق من حالة الاشتراك
+//const cache = new NodeCache({ stdTTL: 600 }); // مدة التخزين المؤقت 10 دقائق (600 ثانية)
+const cache = new NodeCache({ stdTTL: 3600 }); // مدة التخزين المؤقت ساعة واحدة (3600 ثانية)
+
+// دالة للتحقق من حالة التفعيل
 async function isUserSubscribed(userId) {
-  if (userSubscriptions.has(userId)) {
-    return userSubscriptions.get(userId);
+  // إذا كانت حالة التفعيل مخزنة وصالحة، قم بإعادتها مباشرة
+  const cachedActivation = cache.get(userId);
+  if (cachedActivation !== undefined) {
+    return cachedActivation;
   }
 
+  // تحقق من قاعدة البيانات إذا لم تكن الحالة مخزنة
   let connection;
   try {
     connection = await pool.getConnection();
-    const [results] = await connection.execute('SELECT activated, expiryDate FROM users WHERE id = ?', [userId]);
-    const isSubscribed = results.length > 0 && results[0].activated === 1 && new Date(results[0].expiryDate) > new Date();
-    userSubscriptions.set(userId, isSubscribed); // تخزين حالة الاشتراك مؤقتًا
-    return isSubscribed;
+    const [results] = await connection.execute('SELECT activated FROM users WHERE id = ?', [userId]);
+    if (results.length > 0) {
+      const user = results[0];
+      const isActivated = user.activated === 1;
+      cache.set(userId, isActivated); // تحديث حالة التفعيل في الذاكرة المؤقتة
+      return isActivated;
+    } else {
+      cache.set(userId, false); // إذا لم يكن هناك سجل للمستخدم
+      return false;
+    }
   } catch (err) {
-    console.error('Error checking subscription status:', err);
+    console.error('Error checking activation status:', err);
     return false;
   } finally {
     if (connection) connection.release();
   }
 }
-
 // لوحة مفاتيح قنوات التنبيهات
 const notificationChannelsKeyboard = {
   inline_keyboard: [
@@ -178,42 +186,34 @@ const notificationChannelsKeyboard = {
     ]
   ]
 };
-
 // لوحة مفاتيح الدعم الفني والعودة
 const supportAndBackKeyboard = {
   inline_keyboard: [
     [
       { text: 'الدعم الفني 📩', url: 'https://t.me/MZZ_2' },
-      { text: 'رابط المتجر 🛒', url: 'https://www.dzrt.com/ar/our-products.html' }
+      { text: 'رابط المتجر 🛒', url: 'www.dzrtgg.com' }
     ],
     [
       { text: 'رجوع 🔙', callback_data: 'start' }
     ]
   ]
 };
-
 // تخزين معرفات الرسائل في خريطة
 const userMessagesMap = new Map();
-
 bot.onText(/\/start/, async (msg) => {
   const chatId = msg.chat.id;
   const userId = msg.from.id;
-
   const currentTime = new Date().getTime();
   const lastStartTime = rateLimitMap.get(userId) || 0;
-
   // تحديد فترة السماح بالمللي ثانية (مثلاً 20 ثانية)
   const timeLimit = 20000;
-
   if (currentTime - lastStartTime < timeLimit) {
     bot.sendMessage(chatId, '⚠️ تجنب ارسال امر - /start - متكرر\n\n تم ايقاف الامر موقتا لمده من الوقت');
     return;
   }
-
   // تحديث آخر وقت تلقى فيه المستخدم أمر /start
   rateLimitMap.set(userId, currentTime);
   userClicks.set(userId, 0);
-
   // حذف الرسائل السابقة
   if (userMessagesMap.has(userId)) {
     const previousMessages = userMessagesMap.get(userId);
@@ -224,7 +224,6 @@ bot.onText(/\/start/, async (msg) => {
     });
     userMessagesMap.delete(userId);
   }
-
   const isSubscribed = await isUserSubscribed(userId);
   const mainKeyboard = {
     inline_keyboard: [
@@ -246,11 +245,10 @@ bot.onText(/\/start/, async (msg) => {
         { text: 'القروب العام 📢', url: 'https://t.me/+hrIusgChjeMwY2Zk' }
       ],
       [
-        { text: 'رابط المتجر 🛒', url: 'https://www.dzrt.com/ar/our-products.html' }
+        { text: 'رابط المتجر 🛒', url: 'www.dzrtgg.com' }
       ]
     ]
   };
-
   const welcomeMessage = `
 ⚡ **انضم إلى البوت الأسرع والأكثر تقدمًا** ⚡
 
@@ -261,29 +259,25 @@ bot.onText(/\/start/, async (msg) => {
 - أكمل عملية الشراء
 - استخدم الرمز لتفعيل الاشتراك
 - وبإمكانك تمديد اشتراكك
-عن طريق زر *معرفة الاشتراك*
+عن طريق زر *حالة الاشتراك*
 
 👇🏻 **انضم الآن وقم بزيارة المتجر والاشتراك!** 👇🏻
-[رابط متجر دزرت فوري](https://dzrt.com)
+                    www.dzrtgg.com
 `;
-
   bot.sendMessage(chatId, welcomeMessage, {
     reply_markup: mainKeyboard,
     parse_mode: 'Markdown'
   }).then((sentMessage) => {
     userMessagesMap.set(userId, [sentMessage.message_id]);
   });
-
   bot.on('callback_query', async (callbackQuery) => {
     const msg = callbackQuery.message;
     const data = callbackQuery.data;
     const callbackUserId = callbackQuery.from.id;
     if (callbackUserId !== userId) return;
-
     const updateMessage = (text, keyboard, msg) => {
       const isContentDifferent = msg.text !== text;
       const isKeyboardDifferent = JSON.stringify(msg.reply_markup) !== JSON.stringify(keyboard);
-
       if (isContentDifferent || isKeyboardDifferent) {
         bot.editMessageText(text, {
           chat_id: msg.chat.id,
@@ -297,10 +291,9 @@ bot.onText(/\/start/, async (msg) => {
         });
       }
     };
-
     if (data === 'notification_channels_command') {
-      const notificationChannelsText = `
-⚡ **انضم إلى البوت الأسرع والأكثر تقدمًا** ⚡ 
+      const notificationChannelsText =`
+⚡ **انضم إلى البوت الأسرع والأكثر تقدمًا** ⚡
 
 قروب دزرت فوري العام 👇🏻:
 [قروب دزرت فوري](https://t.me/+hrIusgChjeMwY2Zk)
@@ -312,7 +305,7 @@ bot.onText(/\/start/, async (msg) => {
 عن طريق زر *حالة الاشتراك*
 
 👇🏻 **انضم الآن وقم بزيارة المتجر والاشتراك!** 👇🏻
-[رابط متجر دزرت فوري](https://dzrt.com)
+                    www.dzrtgg.com
 `;
       updateMessage(notificationChannelsText, notificationChannelsKeyboard, msg);
     } else if (data === 'activate_subscription_command') {
@@ -369,7 +362,6 @@ bot.onText(/\/start/, async (msg) => {
       handleFreeTrial(userId, async (response, showChannelsButton) => {
         const keyboard = showChannelsButton ? notificationChannelsKeyboard : supportAndBackKeyboard;
         updateMessage(response, keyboard, msg);
-
         // إذا تم تفعيل التجربة المجانية، قم بتحديث لوحة المفاتيح الرئيسية
         if (showChannelsButton) {
           const updatedMainKeyboard = {
@@ -386,7 +378,7 @@ bot.onText(/\/start/, async (msg) => {
                 { text: 'حالة الاشتراك 📊', callback_data: 'subscription_status_command' }
               ],
               [
-                { text: 'رابط المتجر 🛒', url: 'https://www.dzrt.com/ar/our-products.html' }
+                { text: ' المتجر 🛒', url: 'www.dzrtgg.com' }
               ]
             ]
           };
@@ -431,7 +423,7 @@ bot.onText(/\/start/, async (msg) => {
             { text: 'القروب العام 📢', url: 'https://t.me/+hrIusgChjeMwY2Zk' }
           ],
           [
-            { text: 'رابط المتجر 🛒', url: 'https://www.dzrt.com/ar/our-products.html' }
+            { text: ' المتجر 🛒', url: 'www.dzrtgg.com' }
           ]
         ]
       };
@@ -496,16 +488,30 @@ async function getSubscriptionStatus(userId, callback) {
     if (connection) connection.release();
   }
 }
-
 // تفعيل الاشتراك
 async function activateSubscription(userId, code, callback) {
   let connection;
+
+        
   try {
     connection = await pool.getConnection();
     const [results] = await connection.execute('SELECT * FROM activationcodes WHERE activation_code = ?', [code]);
     if (results.length > 0) {
       const duration = results[0].duration_in_months;
-      await activateUserSubscription(userId, code, duration, callback);
+      await activateUserSubscription(userId, code, duration, async (message) => {
+        await callback(message);
+        
+        // حذف الرسائل السابقة بعد تفعيل الاشتراك بنجاح
+        if (userMessagesMap.has(userId)) {
+          const previousMessages = userMessagesMap.get(userId);
+          previousMessages.forEach(messageId => {
+            bot.deleteMessage(userId, messageId).catch((error) => {
+              console.error('Error deleting previous message:', error);
+            });
+          });
+          userMessagesMap.delete(userId);
+        }
+      });
     } else {
       callback('الرمز غير صالح⚠️');
     }
@@ -516,24 +522,20 @@ async function activateSubscription(userId, code, callback) {
     if (connection) connection.release();
   }
 }
-
 // التعامل مع التجربة المجانية
 async function handleFreeTrial(userId, callback) {
   let connection;
   try {
     connection = await pool.getConnection();
     await connection.beginTransaction();
-
     const [results] = await connection.execute('SELECT trial_used, activated FROM users WHERE id = ?', [userId]);
-
     if (results.length > 0) {
       const user = results[0];
       const [trialCountResult] = await connection.execute('SELECT count FROM trial_usage WHERE id = 1 FOR UPDATE');
       const trialCount = trialCountResult[0].count;
-
       if (user.trial_used) {
         await connection.rollback();
-        callback('لقد استخدمت التجربة المجانية مسبقًا ⚠️.\n\nبامكانك الاشتراك من هنا:\n[رابط المتجر] او الضغط على زر المتجر👇🏻\n\n https://www.dzrt.com/ar/our-products.html', false);
+        callback('لقد استخدمت التجربة المجانية مسبقًا ⚠️.\n\nبامكانك الاشتراك من هنا:\n[رابط المتجر] او الضغط على زر المتجر👇🏻\n\n www.dzrtgg.com', false);
       } else if (user.activated) {
         await connection.rollback();
         callback('لديك اشتراك نشط حاليًا ⚠️.', false);
@@ -541,24 +543,27 @@ async function handleFreeTrial(userId, callback) {
         await connection.rollback();
         callback('لقد تم استخدام جميع الاشتراكات التجريبية المجانية لهذا اليوم ⚠️.', false);
       } else {
-        await activateFreeTrial(userId, connection);
+        const expiryDateTime = await activateFreeTrial(userId, connection);
         await connection.execute('UPDATE trial_usage SET count = count + 1 WHERE id = 1');
         await connection.commit();
-        userSubscriptions.set(userId, true); // تحديث حالة الاشتراك بعد تفعيل التجربة المجانية بنجاح
+        userSubscriptions.set(userId, true); // تحديث حالة الاشتراك في الذاكرة المؤقتة
+        cache.set(userId, true); // تحديث التخزين المؤقت
         callback('تم تفعيل الاشتراك التجريبي المجاني ليوم واحد 🎉\n\n\n\nاختر القنوات التي تريد الانضمام لها', true);
+        // إعادة إرسال رسالة /start بعد التفعيل لضمان تحديث القائمة
+        //bot.sendMessage(userId, '/start');
       }
     } else {
       const [trialCountResult] = await connection.execute('SELECT count FROM trial_usage WHERE id = 1 FOR UPDATE');
       const trialCount = trialCountResult[0].count;
-
       if (trialCount >= 20) {
         await connection.rollback();
-        callback('لقد تم استخدام جميع الاشتراكات التجريبية المجانية لهذا اليوم ⚠️.\n\n يوميا الساعه 12 ظهرا سيتم اعادة تعيين التجربة الى اول 20 شخص', false);
+        callback('لقد تم استخدام جميع الاشتراكات التجريبية المجانية لهذا اليوم ⚠️.\n\n يوميا الساعه 10 صباحا سيتم اعادة تعيين التجربة الى اول 20 شخص', false);
       } else {
-        await activateFreeTrial(userId, connection);
+        const expiryDateTime = await activateFreeTrial(userId, connection);
         await connection.execute('UPDATE trial_usage SET count = count + 1 WHERE id = 1');
         await connection.commit();
-        userSubscriptions.set(userId, true); // تحديث حالة الاشتراك بعد تفعيل التجربة المجانية بنجاح
+        userSubscriptions.set(userId, true); // تحديث حالة الاشتراك في الذاكرة المؤقتة
+        cache.set(userId, true); // تحديث التخزين المؤقت
         callback('تم تفعيل الاشتراك التجريبي المجاني ليوم واحد 🎉\n\n\n\nاختر القنوات التي تريد الانضمام لها', true);
       }
     }
@@ -576,17 +581,16 @@ async function activateFreeTrial(userId, connection) {
   const startDate = new Date().toISOString().split('T')[0];
   let expiryDate = new Date();
   expiryDate.setHours(23, 59, 59, 999); // تعيين وقت الانتهاء ليكون في نهاية اليوم الحالي
-
   const insertOrUpdateQuery = `
     INSERT INTO users (id, activated, subscriptionType, startDate, expiryDate, trial_used)
     VALUES (?, ?, ?, ?, ?, ?)
     ON DUPLICATE KEY UPDATE activated = VALUES(activated), subscriptionType = VALUES(subscriptionType), startDate = VALUES(startDate), expiryDate = VALUES(expiryDate), trial_used = VALUES(trial_used)
   `;
   await connection.execute(insertOrUpdateQuery, [userId, true, '1 يوم', startDate, expiryDate.toISOString().split('T')[0], true]);
+  return expiryDate; // إرجاع تاريخ الانتهاء لاستخدامه في التحديث
 }
-
-// جدولة إعادة تعيين العداد عند الساعة 12 ظهرًا
-cron.schedule('0 12 * * *', async () => {
+// جدولة إعادة تعيين العداد عند الساعة 10 ظهرًا
+cron.schedule('0 10 * * *', async () => {
   let connection;
   try {
     connection = await pool.getConnection();
@@ -598,34 +602,50 @@ cron.schedule('0 12 * * *', async () => {
   }
 });
 
+const productCache = new NodeCache({ stdTTL: 43200 }); // مدة التخزين المؤقت 43200 ثانية (12 ساعة)
+
 async function getProductAvailability(callback) {
+  // تحقق من وجود البيانات في الكاش
+  const cachedData = productCache.get("productAvailability");
+  if (cachedData) {
+    callback(cachedData); // إعادة البيانات المخزنة في الكاش
+    return;
+  }
+
   let connection;
   try {
     connection = await pool.getConnection();
-    const threeDaysAgo = new Date(new Date().setDate(new Date().getDate() - 3)).toISOString().slice(0, 19).replace('T', ' ');
+    const fiveDaysAgo = new Date(new Date().setDate(new Date().getDate() - 5)).toISOString().slice(0, 19).replace('T', ' ');
 
-    // Adjusting the query to get the first notification of each day
     const [results] = await connection.execute(`
-      SELECT MIN(notification_time) as notification_time 
+      SELECT notification_time 
       FROM product_notifications 
       WHERE notification_time >= ? 
-      GROUP BY DATE(notification_time) 
       ORDER BY notification_time ASC
-    `, [threeDaysAgo]);
+    `, [fiveDaysAgo]);
 
     if (results.length === 0) {
       callback('لا توجد معلومات متاحة حاليًا حول توفر المنتجات. ⚠️');
       return;
     }
 
-    let response = `** وقت أول إشعار للثلاثة ايام السابقة :**\n\n`;
-    results.forEach((row, index) => {
+    let response = `** وقت أول إشعار للخمس ايام السابقة :**\n\n`;
+    let daysAdded = new Set();
+
+    results.forEach((row) => {
       const notificationTime = new Date(row.notification_time);
       const dayName = notificationTime.toLocaleDateString('ar-SA', { weekday: 'long' });
       const formattedTime = notificationTime.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
-      response += `\n ${dayName} - ${formattedTime} 🕒\n`;
+      const formattedDate = notificationTime.toLocaleDateString('en-CA'); // 2024-07-16
+
+      if (!daysAdded.has(dayName)) {
+        response += `${dayName} - ${formattedDate}:\n الوقت : ${formattedTime} 🕒 \n\n`;
+        daysAdded.add(dayName);
+      }
     });
 
+    // حفظ النتائج في الكاش
+    productCache.set("productAvailability", response);
     callback(response);
   } catch (err) {
     console.error('Error getting product availability:', err);
@@ -634,3 +654,27 @@ async function getProductAvailability(callback) {
     if (connection) connection.release();
   }
 }
+
+// وظيفة لحذف الإشعارات القديمة
+async function deleteOldNotifications() {
+  let connection;
+  try {
+    connection = await pool.getConnection();
+    const fiveDaysAgo = new Date(new Date().setDate(new Date().getDate() - 5)).toISOString().slice(0, 19).replace('T', ' ');
+
+    const [result] = await connection.execute(`
+      DELETE FROM product_notifications 
+      WHERE notification_time < ?
+    `, [fiveDaysAgo]);
+
+    console.log(`${result.affectedRows} old notifications deleted.`);
+  } catch (err) {
+    console.error('Error deleting old notifications:', err);
+  } finally {
+    if (connection) connection.release();
+  }
+}
+
+// استدعاء وظيفة حذف الإشعارات القديمة بشكل دوري (كل 24 ساعة)
+setInterval(deleteOldNotifications, 24 * 60 * 60 * 1000);
+

@@ -4,6 +4,7 @@ const cron = require('node-cron');
 const { RateLimiterMemory } = require('rate-limiter-flexible');
 const NodeCache = require("node-cache");
 require('dotenv').config();
+
 // إعدادات قاعدة البيانات
 const dbConfig = {
   host: process.env.DB_HOST,
@@ -12,6 +13,7 @@ const dbConfig = {
   database: process.env.DB_DATABASE,
   port: process.env.DB_PORT
 };
+
 const token = process.env.TOKEN4;
 const bot = new TelegramBot(token, { polling: true });
 const pool = mysql.createPool(dbConfig);
@@ -19,10 +21,6 @@ const activeUsers = new Map();
 const userClicks = new Map();
 const rateLimitMap = new Map(); // لتتبع آخر وقت تلقى فيه المستخدم أمر /start
 const userSubscriptions = new Map(); // لتخزين حالة الاشتراك مؤقتًا
-const rateLimiter = new RateLimiterMemory({
-  points: 5, // عدد النقاط التي يمكن للمستخدم الحصول عليها
-  duration: 10, // مدة الصلاحية للنقاط بالثواني
-});
 
 // تفعيل اشتراك المستخدم
 async function activateUserSubscription(userId, code, duration, callback) {
@@ -245,12 +243,13 @@ bot.onText(/\/start/, async (msg) => {
         { text: 'القروب العام 📢', url: 'https://t.me/+hrIusgChjeMwY2Zk' }
       ],
       [
-        { text: 'رابط المتجر 🛒', url: 'www.dzrtgg.com' }
+        { text: ' المتجر 🛒', url: 'www.dzrtgg.com' }
       ]
     ]
   };
   const welcomeMessage = `
 ⚡ **انضم إلى البوت الأسرع والأكثر تقدمًا** ⚡
+
 قروب دزرت فوري العام 👇🏻:
 [قروب دزرت فوري](https://t.me/+hrIusgChjeMwY2Zk)
 
@@ -261,7 +260,7 @@ bot.onText(/\/start/, async (msg) => {
 عن طريق زر *حالة الاشتراك*
 
 👇🏻 **انضم الآن وقم بزيارة المتجر والاشتراك!** 👇🏻
-              www.dzrtgg.com
+                    www.dzrtgg.com
 `;
   bot.sendMessage(chatId, welcomeMessage, {
     reply_markup: mainKeyboard,
@@ -293,6 +292,7 @@ bot.onText(/\/start/, async (msg) => {
     if (data === 'notification_channels_command') {
       const notificationChannelsText =`
 ⚡ **انضم إلى البوت الأسرع والأكثر تقدمًا** ⚡
+
 قروب دزرت فوري العام 👇🏻:
 [قروب دزرت فوري](https://t.me/+hrIusgChjeMwY2Zk)
 
@@ -303,7 +303,7 @@ bot.onText(/\/start/, async (msg) => {
 عن طريق زر *حالة الاشتراك*
 
 👇🏻 **انضم الآن وقم بزيارة المتجر والاشتراك!** 👇🏻
-              www.dzrtgg.com
+                    www.dzrtgg.com
 `;
       updateMessage(notificationChannelsText, notificationChannelsKeyboard, msg);
     } else if (data === 'activate_subscription_command') {
@@ -376,7 +376,7 @@ bot.onText(/\/start/, async (msg) => {
                 { text: 'حالة الاشتراك 📊', callback_data: 'subscription_status_command' }
               ],
               [
-                { text: 'رابط المتجر 🛒', url: 'www.dzrtgg.com' }
+                { text: ' المتجر 🛒', url: 'www.dzrtgg.com' }
               ]
             ]
           };
@@ -421,7 +421,7 @@ bot.onText(/\/start/, async (msg) => {
             { text: 'القروب العام 📢', url: 'https://t.me/+hrIusgChjeMwY2Zk' }
           ],
           [
-            { text: 'رابط المتجر 🛒', url: 'www.dzrtgg.com' }
+            { text: ' المتجر 🛒', url: 'www.dzrtgg.com' }
           ]
         ]
       };
@@ -533,7 +533,7 @@ async function handleFreeTrial(userId, callback) {
       const trialCount = trialCountResult[0].count;
       if (user.trial_used) {
         await connection.rollback();
-        callback('لقد استخدمت التجربة المجانية مسبقًا ⚠️.\n\nبامكانك الاشتراك من هنا:\n[رابط المتجر] او الضغط على زر المتجر👇🏻\n\n www.dzrtgg.com', false);
+        callback('لقد استخدمت التجربة المجانية مسبقًا ⚠️.\n\nبامكانك الاشتراك من هنا:\n[ المتجر] او الضغط على زر المتجر👇🏻\n\n www.dzrtgg.com', false);
       } else if (user.activated) {
         await connection.rollback();
         callback('لديك اشتراك نشط حاليًا ⚠️.', false);
@@ -637,7 +637,7 @@ async function getProductAvailability(callback) {
       const formattedDate = notificationTime.toLocaleDateString('en-CA'); // 2024-07-16
 
       if (!daysAdded.has(dayName)) {
-        response += `${dayName} - ${formattedDate}:\n الوقت : ${formattedTime} 🕒 \n\n`;
+        response += `${dayName}\nالساعة : ${formattedTime} 🕒 \n\n`;
         daysAdded.add(dayName);
       }
     });

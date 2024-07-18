@@ -55,9 +55,8 @@ const mainChannelId = process.env.CHAT_ID_MAIN;
 const token = process.env.TOKEN3;
 const bot = new TelegramBot(token, { polling: true });
 
-
 const productCooldown = 14 * 60 * 1000; // فترة التهدئة الفردية (14 دقيقة)
-const unavailableThreshold = 3; // عدد المرات التي يجب أن يكون فيها المنتج غير متوفر قبل إرسال إشعار
+const unavailableThreshold = 5; // عدد الثواني التي يجب أن يكون فيها المنتج غير متوفر قبل إرسال إشعار
 let firstNotificationSaved = false; // متغير للتحقق مما إذا تم حفظ أول إشعار أم لا
 
 const productStatus = {};
@@ -149,7 +148,8 @@ async function checkProductAvailability(url) {
       } else {
         // المنتج غير متوفر
         productStatus[url].unavailableCount += 1; // زيادة عداد النفاد
-
+        
+        // يتم إرسال إشعار النفاد فور تحقق الشروط دون تطبيق فترة التهدئة
         if (productStatus[url].wasAvailable && !productStatus[url].isOutOfStockNotified && productStatus[url].unavailableCount >= unavailableThreshold) {
           const message = `*${productNameAr}* - نفذ من المخزون ❌`;
 
@@ -176,6 +176,7 @@ async function checkAllUrls() {
   }
 }
 
+// جدولة التحقق كل ثانية
 cron.schedule('* * * * * *', () => { 
   const now = new Date();
   const hour = now.getHours();
