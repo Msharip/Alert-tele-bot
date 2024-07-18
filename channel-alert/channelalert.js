@@ -135,24 +135,18 @@ async function checkProductAvailability(url) {
           }
         }
       } else if (isUnavailable) {
-        // تحقق من استقرار حالة المنتج (التأكد من أنه غير متوفر فعلاً)
-        setTimeout(async () => {
-          const { data: recheckData } = await axios.get(url);
-          const $$ = cheerio.load(recheckData);
-          const isStillUnavailable = $$('div.stock.unavailable span').length > 0;
+        const messageOutOfStock = `*${productNameAr}* - نفذ من المخزون ❌`;
 
-          if (isStillUnavailable && !productStatus[url].isOutOfStockNotified) {
-            const messageOutOfStock = `*${productNameAr}* - نفذ من المخزون ❌`;
+        await bot.sendPhoto(channels[url].chatId, imageUrlOutOfStock(url), {
+          caption: messageOutOfStock,
+          parse_mode: 'Markdown'
+        });
 
-            await bot.sendPhoto(channels[url].chatId, imageUrlOutOfStock(url), {
-              caption: messageOutOfStock,
-              parse_mode: 'Markdown'
-            });
-
-            productStatus[url].isAvailable = false;
-            productStatus[url].isOutOfStockNotified = true;
-          }
-        }, 5000); // إعادة التحقق بعد 5 ثوانٍ للتأكد من أن المنتج غير متوفر فعلاً
+        productStatus[url] = {
+          isAvailable: false,
+          isOutOfStockNotified: true,
+          individualCooldownTime: currentTime
+        };
       }
     }
   } catch (error) {
@@ -166,8 +160,9 @@ async function checkAllUrls() {
     }
   }
 }
+
 // جدولة التحقق كل ثانية
-cron.schedule('* * * * * *', () => { 
+cron.schedule('* * * * * *', () => {
   const now = new Date();
   const hour = now.getHours();
 
