@@ -229,7 +229,7 @@ bot.onText(/\/start/, async (msg) => {
       ] : [],
       isSubscribed ? [
         { text: 'قنوات التنبيهات 🔔', callback_data: 'notification_channels_command' },
-        { text: 'تفعيل الاشتراك 🔑', callback_data: 'activate_subscription_command' }
+        { text: 'تمديد الاشتراك 🔄', callback_data: 'activate_subscription_command' }
       ] : [
         { text: 'تجربة مجانية 🎁', callback_data: 'free_trial_command' },
         { text: 'تفعيل الاشتراك 🔑', callback_data: 'activate_subscription_command' }
@@ -368,7 +368,7 @@ bot.onText(/\/start/, async (msg) => {
               ],
               [
                 { text: 'قنوات التنبيهات 🔔', callback_data: 'notification_channels_command' },
-                { text: 'تفعيل الاشتراك 🔑', callback_data: 'activate_subscription_command' },
+                { text: 'تمديد الاشتراك 🔄', callback_data: 'activate_subscription_command' },
               ],
               [
                 { text: 'الدعم الفني 📩', url: 'https://t.me/MZZ_2' },
@@ -407,7 +407,7 @@ bot.onText(/\/start/, async (msg) => {
           ] : [],
           isSubscribed ? [
             { text: 'قنوات التنبيهات 🔔', callback_data: 'notification_channels_command' },
-            { text: 'تفعيل الاشتراك 🔑', callback_data: 'activate_subscription_command' }
+            { text: 'تمديد الاشتراك 🔄', callback_data: 'activate_subscription_command' }
           ] : [
             { text: 'تجربة مجانية 🎁', callback_data: 'free_trial_command' },
             { text: 'تفعيل الاشتراك 🔑', callback_data: 'activate_subscription_command' }
