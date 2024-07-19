@@ -5,13 +5,15 @@ const { RateLimiterMemory } = require('rate-limiter-flexible');
 const NodeCache = require("node-cache");
 require('dotenv').config();
 
-// إعدادات قاعدة البيانات
 const dbConfig = {
   host: process.env.DB_HOST,
   user: process.env.DB_USER,
   password: process.env.DB_PASSWORD,
   database: process.env.DB_DATABASE,
-  port: process.env.DB_PORT
+  port: process.env.DB_PORT,
+  waitForConnections: true,  // الانتظار للاتصالات عند الوصول إلى الحد الأقصى
+  connectionLimit: 30,       // الحد الأقصى لعدد الاتصالات في التجمع
+  queueLimit: 0              // عدم وجود حد لطول قائمة الانتظار
 };
 
 const token = process.env.TOKEN4;
@@ -120,9 +122,7 @@ async function deleteActivationCode(connection, code) {
   const deleteQuery = 'DELETE FROM activationcodes WHERE activation_code = ?';
   await connection.execute(deleteQuery, [code]);
 }
-
-//const cache = new NodeCache({ stdTTL: 600 }); // مدة التخزين المؤقت 10 دقائق (600 ثانية)
-const cache = new NodeCache({ stdTTL: 3600 }); // مدة التخزين المؤقت ساعة واحدة (3600 ثانية)
+const cache = new NodeCache({ stdTTL: 7200 }); // مدة التخزين المؤقت ساعتين (7200 ثانية)
 
 // دالة للتحقق من حالة التفعيل
 async function isUserSubscribed(userId) {
@@ -189,7 +189,7 @@ const supportAndBackKeyboard = {
   inline_keyboard: [
     [
       { text: 'الدعم الفني 📩', url: 'https://t.me/MZZ_2' },
-      { text: 'رابط المتجر 🛒', url: 'www.dzrtgg.com' }
+      { text: ' المتجر 🛒', url: 'www.dzrtgg.com' }
     ],
     [
       { text: 'رجوع 🔙', callback_data: 'start' }
