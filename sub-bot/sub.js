@@ -1,7 +1,7 @@
 const TelegramBot = require('node-telegram-bot-api');
 const mysql = require('mysql2/promise');
 const cron = require('node-cron');
-const { RateLimiterMemory } = require('rate-limiter-flexible');
+require('rate-limiter-flexible');
 const NodeCache = require("node-cache");
 require('dotenv').config();
 
@@ -15,7 +15,6 @@ const dbConfig = {
   connectionLimit: 30,       // الحد الأقصى لعدد الاتصالات في التجمع
   queueLimit: 0              // عدم وجود حد لطول قائمة الانتظار
 };
-
 const token = process.env.TOKEN4;
 const bot = new TelegramBot(token, { polling: true });
 const pool = mysql.createPool(dbConfig);

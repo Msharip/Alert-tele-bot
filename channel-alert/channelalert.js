@@ -192,8 +192,12 @@ const dbConfig = {
   user: process.env.DB_USER,
   password: process.env.DB_PASSWORD,
   database: process.env.DB_DATABASE,
-  port: process.env.DB_PORT
+  port: process.env.DB_PORT,
+  waitForConnections: true,  // الانتظار للاتصالات عند الوصول إلى الحد الأقصى
+  connectionLimit: 30,       // الحد الأقصى لعدد الاتصالات في التجمع
+  queueLimit: 0              // عدم وجود حد لطول قائمة الانتظار
 };
+
 // إنشاء مجموعة من الاتصالات
 const pool = mysql.createPool(dbConfig);
 const BATCH_SIZE = 50;
