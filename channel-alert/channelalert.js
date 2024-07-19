@@ -55,20 +55,17 @@ const mainChannelId = process.env.CHAT_ID_MAIN;
 const token = process.env.TOKEN3;
 const bot = new TelegramBot(token, { polling: true });
 const productCooldown = 14 * 60 * 1000; // فترة التهدئة الفردية (14 دقيقة)
-const unavailableThreshold = 5; // عدد الثواني التي يجب أن يكون فيها المنتج غير متوفر قبل إرسال إشعار
-let firstNotificationSaved = false; // متغير للتحقق مما إذا تم حفظ أول إشعار أم لا
+const firstNotificationSaved = false; // متغير للتحقق مما إذا تم حفظ أول إشعار أم لا
 
 const productStatus = {};
 
 urls.forEach(url => {
   productStatus[url] = {
     isAvailable: false,
-    wasAvailable: false,
     lastNotificationTime: 0,
     isNotifying: false,
     isOutOfStockNotified: false,
-    individualCooldownTime: 0,
-    unavailableCount: 0 // متغير جديد للتحقق من عدد المرات التي يكون فيها المنتج غير متوفر
+    individualCooldownTime: 0
   };
 });
 
@@ -82,85 +79,62 @@ async function checkProductAvailability(url) {
     if (productNames[url]) {
       const productNameAr = productNames[url].ar;
       const imageUrlAvailable = path.join(__dirname, '..', 'images', `${productNames[url].en}.png`);
-      const imageUrlOutOfStock = path.join(__dirname, '..', 'images', `${productNames[url].en}-outofstock.png`);
 
-      if (!isUnavailable) {
-        // المنتج متوفر الآن
-        productStatus[url].wasAvailable = true;
-        productStatus[url].isOutOfStockNotified = false; // إعادة تعيين إشعار النفاد
-        productStatus[url].unavailableCount = 0; // إعادة تعيين عدد مرات النفاد
+      if (!isUnavailable && (currentTime - productStatus[url].individualCooldownTime > productCooldown)) {
+        const localTime = moment(currentTime).tz('Asia/Riyadh').format('YYYY-MM-DD HH:mm:ss');
+        const message = `*${productNameAr}* - متوفر الآن ✅`;
+        console.log(`*${productNameAr}* - متوفر الآن ✅`);
 
-        if (currentTime - productStatus[url].individualCooldownTime > productCooldown) {
-          const localTime = moment(currentTime).tz('Asia/Riyadh').format('YYYY-MM-DD HH:mm:ss');
-          const message = `*${productNameAr}* - متوفر الآن ✅`;
-          console.log(`*${productNameAr}* - متوفر الآن ✅`);
-
-          const replyMarkup = {
-            inline_keyboard: [
-              [
-                { text: 'شراء سريع ⚡', url: 'https://www.dzrt.com/ar/onestepcheckout.html' },
-                { text: 'إضافة للسلة 🛒', url: url }
-              ],
-              [
-                { text: 'اعادة الطلب 🔁', url: 'https://www.dzrt.com/ar/sales/order/history/' }
-              ]
+        const replyMarkup = {
+          inline_keyboard: [
+            [
+              { text: 'شراء سريع ⚡', url: 'https://www.dzrt.com/ar/onestepcheckout.html' },
+              { text: 'إضافة للسلة 🛒', url: url }
+            ],
+            [
+              { text: 'اعادة الطلب 🔁', url: 'https://www.dzrt.com/ar/sales/order/history/' }
             ]
-          };
+          ]
+        };
 
-          await bot.sendPhoto(mainChannelId, imageUrlAvailable, {
-            caption: message,
-            parse_mode: 'Markdown',
-            reply_markup: JSON.stringify(replyMarkup)
-          });
+        await bot.sendPhoto(mainChannelId, imageUrlAvailable, {
+          caption: message,
+          parse_mode: 'Markdown',
+          reply_markup: JSON.stringify(replyMarkup)
+        });
 
-          await bot.sendPhoto(channels[url].chatId, imageUrlAvailable, {
-            caption: message,
-            parse_mode: 'Markdown',
-            reply_markup: JSON.stringify(replyMarkup)
-          });
+        await bot.sendPhoto(channels[url].chatId, imageUrlAvailable, {
+          caption: message,
+          parse_mode: 'Markdown',
+          reply_markup: JSON.stringify(replyMarkup)
+        });
 
-          productStatus[url] = {
-            ...productStatus[url],
-            isAvailable: true,
-            lastNotificationTime: currentTime,
-            isNotifying: true,
-            isOutOfStockNotified: false,
-            individualCooldownTime: currentTime
-          };
+        productStatus[url] = {
+          isAvailable: true,
+          lastNotificationTime: currentTime,
+          isNotifying: true,
+          isOutOfStockNotified: false,
+          individualCooldownTime: currentTime
+        };
 
-          setTimeout(() => {
-            productStatus[url].isNotifying = false;
-          }, productCooldown);
+        setTimeout(() => {
+          productStatus[url].isNotifying = false;
+        }, productCooldown);
 
-          if (!firstNotificationSaved) {
-            // إضافة وقت أول إشعار إلى قاعدة البيانات لأول منتج فقط
-            const connection = await pool.getConnection();
-            try {
-              const query = 'INSERT INTO product_notifications (product_url, notification_time) VALUES (?, ?)';
-              await connection.query(query, [url, localTime]);
-              firstNotificationSaved = true; // تعيين المتغير بعد حفظ أول إشعار
-            } finally {
-              connection.release();
-            }
+        if (!firstNotificationSaved) {
+          // إضافة وقت أول إشعار إلى قاعدة البيانات لأول منتج فقط
+          const connection = await pool.getConnection();
+          try {
+            const query = 'INSERT INTO product_notifications (product_url, notification_time) VALUES (?, ?)';
+            await connection.query(query, [url, localTime]);
+            firstNotificationSaved = true; // تعيين المتغير بعد حفظ أول إشعار
+          } finally {
+            connection.release();
           }
         }
-      } else {
-        // المنتج غير متوفر
-        productStatus[url].unavailableCount += 1; // زيادة عداد النفاد
-
-        // يتم إرسال إشعار النفاد فور تحقق الشروط دون تطبيق فترة التهدئة
-        if (productStatus[url].wasAvailable && !productStatus[url].isOutOfStockNotified && productStatus[url].unavailableCount >= unavailableThreshold) {
-          const message = `*${productNameAr}* - نفذ من المخزون ❌`;
-
-          await bot.sendPhoto(channels[url].chatId, imageUrlOutOfStock, {
-            caption: message,
-            parse_mode: 'Markdown'
-          });
-
-          productStatus[url].isOutOfStockNotified = true;
-          productStatus[url].wasAvailable = false; // إعادة تعيين حالة التوفر السابقة
-          productStatus[url].unavailableCount = 0; // إعادة تعيين عداد النفاد بعد إرسال الإشعار
-        }
+      } else if (isUnavailable) {
+        // إذا كان المنتج غير متوفر، لا نفعل شيئاً
+        productStatus[url].isAvailable = false;
       }
     }
   } catch (error) {
@@ -175,8 +149,7 @@ async function checkAllUrls() {
   }
 }
 
-// جدولة التحقق كل ثانية
-cron.schedule('* * * * * *', () => { 
+cron.schedule('* * * * * *', () => {
   const now = new Date();
   const hour = now.getHours();
 
