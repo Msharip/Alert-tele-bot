@@ -256,7 +256,6 @@ bot.onText(/\/start/, async (msg) => {
 - أكمل عملية الشراء
 - استخدم الرمز لتفعيل الاشتراك
 - وبإمكانك تمديد اشتراكك
-عن طريق زر *حالة الاشتراك*
 
 👇🏻 **انضم الآن وقم بزيارة المتجر والاشتراك!** 👇🏻
                     www.dzrtgg.com
@@ -299,7 +298,7 @@ bot.onText(/\/start/, async (msg) => {
 - أكمل عملية الشراء
 - استخدم الرمز لتفعيل الاشتراك
 - وبإمكانك تمديد اشتراكك
-عن طريق زر *حالة الاشتراك*
+
 
 👇🏻 **انضم الآن وقم بزيارة المتجر والاشتراك!** 👇🏻
                     www.dzrtgg.com
@@ -519,45 +518,53 @@ async function activateSubscription(userId, code, callback) {
     if (connection) connection.release();
   }
 }
-// التعامل مع التجربة المجانية
+const trialCache = new NodeCache({ stdTTL: 86400 }); // 24 ساعة
+
 async function handleFreeTrial(userId, callback) {
   let connection;
   try {
     connection = await pool.getConnection();
     await connection.beginTransaction();
+
+    // الحصول على العداد من التخزين المؤقت
+    let trialCount = trialCache.get('trialCount');
+
+    // إذا لم يكن العداد في التخزين المؤقت، استعلام قاعدة البيانات
+    if (trialCount === undefined) {
+      const [trialCountResult] = await connection.execute('SELECT count FROM trial_usage WHERE id = 1 FOR UPDATE');
+      trialCount = trialCountResult[0].count;
+      trialCache.set('trialCount', trialCount); // تخزين العداد في التخزين المؤقت
+    }
+
     const [results] = await connection.execute('SELECT trial_used, activated FROM users WHERE id = ?', [userId]);
     if (results.length > 0) {
       const user = results[0];
-      const [trialCountResult] = await connection.execute('SELECT count FROM trial_usage WHERE id = 1 FOR UPDATE');
-      const trialCount = trialCountResult[0].count;
       if (user.trial_used) {
         await connection.rollback();
         callback('لقد استخدمت التجربة المجانية مسبقًا ⚠️.\n\nبامكانك الاشتراك من هنا:\n[ المتجر] او الضغط على زر المتجر👇🏻\n\n www.dzrtgg.com', false);
       } else if (user.activated) {
         await connection.rollback();
         callback('لديك اشتراك نشط حاليًا ⚠️.', false);
-      } else if (trialCount >= 20) {
+      } else if (trialCount >= 10) { // هنا يتم التحقق من الحد الأقصى
         await connection.rollback();
-        callback('لقد تم استخدام جميع الاشتراكات التجريبية المجانية لهذا اليوم ⚠️.', false);
+        callback('لقد تم استخدام جميع الاشتراكات التجريبية المجانية لهذا اليوم ⚠️.\n\n يوميا الساعه 10 صباحا سيتم اعادة تعيين التجربة الى اول 10 شخص', false);
       } else {
         const expiryDateTime = await activateFreeTrial(userId, connection);
         await connection.execute('UPDATE trial_usage SET count = count + 1 WHERE id = 1');
+        trialCache.set('trialCount', trialCount + 1); // تحديث العداد في التخزين المؤقت
         await connection.commit();
         userSubscriptions.set(userId, true); // تحديث حالة الاشتراك في الذاكرة المؤقتة
         cache.set(userId, true); // تحديث التخزين المؤقت
         callback('تم تفعيل الاشتراك التجريبي المجاني ليوم واحد 🎉\n\n\n\nاختر القنوات التي تريد الانضمام لها', true);
-        // إعادة إرسال رسالة /start بعد التفعيل لضمان تحديث القائمة
-        //bot.sendMessage(userId, '/start');
       }
     } else {
-      const [trialCountResult] = await connection.execute('SELECT count FROM trial_usage WHERE id = 1 FOR UPDATE');
-      const trialCount = trialCountResult[0].count;
-      if (trialCount >= 20) {
+      if (trialCount >= 10) { // هنا يتم التحقق من الحد الأقصى
         await connection.rollback();
-        callback('لقد تم استخدام جميع الاشتراكات التجريبية المجانية لهذا اليوم ⚠️.\n\n يوميا الساعه 10 صباحا سيتم اعادة تعيين التجربة الى اول 20 شخص', false);
+        callback('لقد تم استخدام جميع الاشتراكات التجريبية المجانية لهذا اليوم ⚠️.\n\n يوميا الساعه 10 صباحا سيتم اعادة تعيين التجربة الى اول 10 شخص', false);
       } else {
         const expiryDateTime = await activateFreeTrial(userId, connection);
         await connection.execute('UPDATE trial_usage SET count = count + 1 WHERE id = 1');
+        trialCache.set('trialCount', trialCount + 1); // تحديث العداد في التخزين المؤقت
         await connection.commit();
         userSubscriptions.set(userId, true); // تحديث حالة الاشتراك في الذاكرة المؤقتة
         cache.set(userId, true); // تحديث التخزين المؤقت
@@ -573,32 +580,19 @@ async function handleFreeTrial(userId, callback) {
   }
 }
 
-// تفعيل التجربة المجانية
-async function activateFreeTrial(userId, connection) {
-  const startDate = new Date().toISOString().split('T')[0];
-  let expiryDate = new Date();
-  expiryDate.setHours(23, 59, 59, 999); // تعيين وقت الانتهاء ليكون في نهاية اليوم الحالي
-  const insertOrUpdateQuery = `
-    INSERT INTO users (id, activated, subscriptionType, startDate, expiryDate, trial_used)
-    VALUES (?, ?, ?, ?, ?, ?)
-    ON DUPLICATE KEY UPDATE activated = VALUES(activated), subscriptionType = VALUES(subscriptionType), startDate = VALUES(startDate), expiryDate = VALUES(expiryDate), trial_used = VALUES(trial_used)
-  `;
-  await connection.execute(insertOrUpdateQuery, [userId, true, '1 يوم', startDate, expiryDate.toISOString().split('T')[0], true]);
-  return expiryDate; // إرجاع تاريخ الانتهاء لاستخدامه في التحديث
-}
-// جدولة إعادة تعيين العداد عند الساعة 10 ظهرًا
+// جدولة إعادة تعيين العداد عند الساعة 10 صباحًا
 cron.schedule('0 10 * * *', async () => {
   let connection;
   try {
     connection = await pool.getConnection();
     await connection.execute('UPDATE trial_usage SET count = 0 WHERE id = 1');
+    trialCache.set('trialCount', 0); // إعادة تعيين العداد في التخزين المؤقت
   } catch (err) {
     console.error('Error resetting trial count:', err);
   } finally {
     if (connection) connection.release();
   }
 });
-
 const productCache = new NodeCache({ stdTTL: 43200 }); // مدة التخزين المؤقت 43200 ثانية (12 ساعة)
 
 async function getProductAvailability(callback) {
