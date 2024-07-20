@@ -299,7 +299,6 @@ bot.onText(/\/start/, async (msg) => {
 - استخدم الرمز لتفعيل الاشتراك
 - وبإمكانك تمديد اشتراكك
 
-
 👇🏻 **انضم الآن وقم بزيارة المتجر والاشتراك!** 👇🏻
                     www.dzrtgg.com
 `;
@@ -486,7 +485,9 @@ async function getSubscriptionStatus(userId, callback) {
 }
 // تفعيل الاشتراك
 async function activateSubscription(userId, code, callback) {
-  let connection;   
+  let connection;
+
+        
   try {
     connection = await pool.getConnection();
     const [results] = await connection.execute('SELECT * FROM activationcodes WHERE activation_code = ?', [code]);
@@ -529,7 +530,7 @@ async function handleFreeTrial(userId, callback) {
       const trialCount = trialCountResult[0].count;
       if (user.trial_used) {
         await connection.rollback();
-        callback('لقد استخدمت التجربة المجانية مسبقًا ⚠️.\n\nبامكانك الاشتراك من هنا:\n[رابط المتجر] او الضغط على زر المتجر👇🏻\n\n www.dzrtgg.com', false);
+        callback('لقد استخدمت التجربة المجانية مسبقًا ⚠️.\n\nبامكانك الاشتراك من هنا:\n[ المتجر] او الضغط على زر المتجر👇🏻\n\n www.dzrtgg.com', false);
       } else if (user.activated) {
         await connection.rollback();
         callback('لديك اشتراك نشط حاليًا ⚠️.', false);
@@ -569,6 +570,7 @@ async function handleFreeTrial(userId, callback) {
     if (connection) connection.release();
   }
 }
+
 // تفعيل التجربة المجانية
 async function activateFreeTrial(userId, connection) {
   const startDate = new Date().toISOString().split('T')[0];
@@ -670,4 +672,3 @@ async function deleteOldNotifications() {
 
 // استدعاء وظيفة حذف الإشعارات القديمة بشكل دوري (كل 24 ساعة)
 setInterval(deleteOldNotifications, 24 * 60 * 60 * 1000);
-
