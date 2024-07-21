@@ -512,7 +512,7 @@ async function activateSubscription(userId, code, callback) {
         }
       });
     } else {
-      callback('الرمز غير صالح⚠️');
+      callback(' ⚠️ الرمز غير صالح اضغط على رجوع\n واعد ادخال الرمز مره اخرى');
     }
   } catch (err) {
     console.error('Error checking activation codes:', err);
