@@ -184,18 +184,6 @@ const notificationChannelsKeyboard = {
   ]
 };
 // لوحة مفاتيح الدعم الفني والعودة
-const supportAndBackKeyboard = {
-  inline_keyboard: [
-    [
-      { text: 'الدعم الفني 📩', url: 'https://t.me/MZZ_2' },
-      { text: ' المتجر 🛒', url: 'www.dzrtgg.com' }
-    ],
-    [
-      { text: 'رجوع 🔙', callback_data: 'start' }
-    ]
-  ]
-};
-// تخزين معرفات الرسائل في خريطة
 const userMessagesMap = new Map();
 bot.onText(/\/start/, async (msg) => {
   const chatId = msg.chat.id;
@@ -223,29 +211,37 @@ bot.onText(/\/start/, async (msg) => {
   }
   const isSubscribed = await isUserSubscribed(userId);
   const mainKeyboard = {
-    inline_keyboard: [
-      isSubscribed ? [
-        { text: 'وقت توفر المنتجات ⏰', callback_data: 'product_availability_command' }
-      ] : [],
-      isSubscribed ? [
+    inline_keyboard: isSubscribed ? [
+      [
         { text: 'قنوات التنبيهات 🔔', callback_data: 'notification_channels_command' },
         { text: 'تمديد الاشتراك 🔄', callback_data: 'activate_subscription_command' }
-      ] : [
-        { text: 'تجربة مجانية 🎁', callback_data: 'free_trial_command' },
+      ],
+      [
+        { text: 'اوقات المنتجات ⏰', callback_data: 'product_availability_command' },
+        { text: 'حالة الاشتراك 📊', callback_data: 'subscription_status_command' }
+      ],
+      [
+        { text: 'الدعم الفني 📩', url: 'https://t.me/MZZ_2' },
+        { text: 'معرف المستخدم 🆔', callback_data: 'chat_id_command' }
+      ],
+      [
+        { text: 'المتجر 🛒', url: 'www.dzrtgg.com' }
+      ]
+    ] : [
+      [
+        { text: 'معرف المستخدم 🆔', callback_data: 'chat_id_command' },
         { text: 'تفعيل الاشتراك 🔑', callback_data: 'activate_subscription_command' }
       ],
-      isSubscribed ? [
-        { text: 'الدعم الفني 📩', url: 'https://t.me/MZZ_2' },
-        { text: 'حالة الاشتراك 📊', callback_data: 'subscription_status_command' }
-      ] : [
+      [
         { text: 'الدعم الفني 📩', url: 'https://t.me/MZZ_2' },
         { text: 'القروب العام 📢', url: 'https://t.me/+hrIusgChjeMwY2Zk' }
       ],
       [
-        { text: ' المتجر 🛒', url: 'www.dzrtgg.com' }
+        { text: 'المتجر 🛒', url: 'www.dzrtgg.com' }
       ]
     ]
   };
+
   const welcomeMessage = `
 ⚡ **انضم إلى البوت الأسرع والأكثر تقدمًا** ⚡
 
@@ -257,8 +253,8 @@ bot.onText(/\/start/, async (msg) => {
 - استخدم الرمز لتفعيل الاشتراك
 - وبإمكانك تمديد اشتراكك
 
-👇🏻 **انضم الآن وقم بزيارة المتجر والاشتراك!** 👇🏻
-                    www.dzrtgg.com
+👇🏻 **قم بزيارة المتجر والاشتراك!** 👇🏻
+                           www.dzrtgg.com
 `;
   bot.sendMessage(chatId, welcomeMessage, {
     reply_markup: mainKeyboard,
@@ -266,6 +262,7 @@ bot.onText(/\/start/, async (msg) => {
   }).then((sentMessage) => {
     userMessagesMap.set(userId, [sentMessage.message_id]);
   });
+
   bot.on('callback_query', async (callbackQuery) => {
     const msg = callbackQuery.message;
     const data = callbackQuery.data;
@@ -287,8 +284,9 @@ bot.onText(/\/start/, async (msg) => {
         });
       }
     };
+
     if (data === 'notification_channels_command') {
-      const notificationChannelsText =`
+      const notificationChannelsText = `
 ⚡ **انضم إلى البوت الأسرع والأكثر تقدمًا** ⚡
 
 قروب دزرت فوري العام 👇🏻:
@@ -299,8 +297,8 @@ bot.onText(/\/start/, async (msg) => {
 - استخدم الرمز لتفعيل الاشتراك
 - وبإمكانك تمديد اشتراكك
 
-👇🏻 **انضم الآن وقم بزيارة المتجر والاشتراك!** 👇🏻
-                    www.dzrtgg.com
+👇🏻 **قم بزيارة المتجر والاشتراك!** 👇🏻
+                           www.dzrtgg.com
 `;
       updateMessage(notificationChannelsText, notificationChannelsKeyboard, msg);
     } else if (data === 'activate_subscription_command') {
@@ -321,7 +319,7 @@ bot.onText(/\/start/, async (msg) => {
         const keyboard = {
           inline_keyboard: [
             [
-              { text: 'تمديد الاشتراك 🔄', callback_data: 'extend_subscription_command' }
+              { text: 'تمديد الاشتراك 🔄', callback_data: 'activate_subscription_command' }
             ],
             [
               { text: 'رجوع 🔙', callback_data: 'start' }
@@ -353,33 +351,22 @@ bot.onText(/\/start/, async (msg) => {
         ]
       };
       updateMessage(supportMessage, keyboard, msg);
-    } else if (data === 'free_trial_command') {
-      handleFreeTrial(userId, async (response, showChannelsButton) => {
-        const keyboard = showChannelsButton ? notificationChannelsKeyboard : supportAndBackKeyboard;
-        updateMessage(response, keyboard, msg);
-        // إذا تم تفعيل التجربة المجانية، قم بتحديث لوحة المفاتيح الرئيسية
-        if (showChannelsButton) {
-          const updatedMainKeyboard = {
-            inline_keyboard: [
-              [
-                { text: 'وقت توفر المنتجات ⏰', callback_data: 'product_availability_command' }
-              ],
-              [
-                { text: 'قنوات التنبيهات 🔔', callback_data: 'notification_channels_command' },
-                { text: 'تمديد الاشتراك 🔄', callback_data: 'activate_subscription_command' },
-              ],
-              [
-                { text: 'الدعم الفني 📩', url: 'https://t.me/MZZ_2' },
-                { text: 'حالة الاشتراك 📊', callback_data: 'subscription_status_command' }
-              ],
-              [
-                { text: ' المتجر 🛒', url: 'www.dzrtgg.com' }
-              ]
-            ]
-          };
-          mainKeyboard.inline_keyboard = updatedMainKeyboard.inline_keyboard;
-        }
-      });
+    } else if (data === 'chat_id_command') {
+      const chatIdMessage = `
+━━━━━━━━━━━━━━━━━━━━
+ **معرف المستخدم الخاص بك هو 🆔:** 
+━━━━━━━━━━━━━━━━━━━━\n\n 🔹 اضغط هنا : \`${chatId}\`
+
+ **اضغط على الرقم الخاص بك لكي يتم نسخه** 📋
+`;
+      const keyboard = {
+        inline_keyboard: [
+          [
+            { text: 'رجوع 🔙', callback_data: 'start' }
+          ]
+        ]
+      };
+      updateMessage(chatIdMessage, keyboard, msg);
     } else if (data === 'product_availability_command') {
       const isSubscribed = await isUserSubscribed(userId);
       if (!isSubscribed) {
@@ -399,26 +386,33 @@ bot.onText(/\/start/, async (msg) => {
     } else if (data === 'start') {
       const isSubscribed = await isUserSubscribed(userId);
       const mainKeyboard = {
-        inline_keyboard: [
-          isSubscribed ? [
-            { text: 'وقت توفر المنتجات ⏰', callback_data: 'product_availability_command' }
-          ] : [],
-          isSubscribed ? [
+        inline_keyboard: isSubscribed ? [
+          [
             { text: 'قنوات التنبيهات 🔔', callback_data: 'notification_channels_command' },
             { text: 'تمديد الاشتراك 🔄', callback_data: 'activate_subscription_command' }
-          ] : [
-            { text: 'تجربة مجانية 🎁', callback_data: 'free_trial_command' },
+          ],
+          [
+            { text: 'اوقات المنتجات ⏰', callback_data: 'product_availability_command' },
+            { text: 'حالة الاشتراك 📊', callback_data: 'subscription_status_command' }
+          ],
+          [
+            { text: 'الدعم الفني 📩', url: 'https://t.me/MZZ_2' },
+            { text: 'معرف المستخدم 🆔', callback_data: 'chat_id_command' }
+          ],
+          [
+            { text: 'المتجر 🛒', url: 'www.dzrtgg.com' }
+          ]
+        ] : [
+          [
+            { text: 'معرف المستخدم 🆔', callback_data: 'chat_id_command' },
             { text: 'تفعيل الاشتراك 🔑', callback_data: 'activate_subscription_command' }
           ],
-          isSubscribed ? [
-            { text: 'الدعم الفني 📩', url: 'https://t.me/MZZ_2' },
-            { text: 'حالة الاشتراك 📊', callback_data: 'subscription_status_command' }
-          ] : [
+          [
             { text: 'الدعم الفني 📩', url: 'https://t.me/MZZ_2' },
             { text: 'القروب العام 📢', url: 'https://t.me/+hrIusgChjeMwY2Zk' }
           ],
           [
-            { text: ' المتجر 🛒', url: 'www.dzrtgg.com' }
+            { text: 'المتجر 🛒', url: 'www.dzrtgg.com' }
           ]
         ]
       };
@@ -449,6 +443,17 @@ bot.on('message', async (msg) => {
           reply_markup: notificationChannelsKeyboard,
           parse_mode: 'Markdown'
         });
+
+        // حذف الرسائل السابقة بعد التفعيل أو التمديد بنجاح
+        if (userMessagesMap.has(userId)) {
+          const previousMessages = userMessagesMap.get(userId);
+          previousMessages.forEach(messageId => {
+            bot.deleteMessage(chatId, messageId).catch((error) => {
+              console.error('Error deleting previous message:', error);
+            });
+          });
+          userMessagesMap.delete(userId);
+        }
       }
     };
 
@@ -459,7 +464,6 @@ bot.on('message', async (msg) => {
     }
   }
 });
-
 // الحصول على حالة الاشتراك
 async function getSubscriptionStatus(userId, callback) {
   let connection;
@@ -500,7 +504,7 @@ async function activateSubscription(userId, code, callback) {
         if (userMessagesMap.has(userId)) {
           const previousMessages = userMessagesMap.get(userId);
           previousMessages.forEach(messageId => {
-            bot.deleteMessage(userId, messageId).catch((error) => {
+            bot.deleteMessage(chatId, messageId).catch((error) => {
               console.error('Error deleting previous message:', error);
             });
           });
@@ -517,85 +521,11 @@ async function activateSubscription(userId, code, callback) {
     if (connection) connection.release();
   }
 }
-// التعامل مع التجربة المجانية
-async function handleFreeTrial(userId, callback) {
-  let connection;
-  try {
-    connection = await pool.getConnection();
-    await connection.beginTransaction();
-    const [results] = await connection.execute('SELECT trial_used, activated FROM users WHERE id = ?', [userId]);
-    if (results.length > 0) {
-      const user = results[0];
-      const [trialCountResult] = await connection.execute('SELECT count FROM trial_usage WHERE id = 1 FOR UPDATE');
-      const trialCount = trialCountResult[0].count;
-      if (user.trial_used) {
-        await connection.rollback();
-        callback('لقد استخدمت التجربة المجانية مسبقًا ⚠️.\n\nبامكانك الاشتراك من هنا:\n[ المتجر] او الضغط على زر المتجر👇🏻\n\n www.dzrtgg.com', false);
-      } else if (user.activated) {
-        await connection.rollback();
-        callback('لديك اشتراك نشط حاليًا ⚠️.', false);
-      } else if (trialCount >= 10) {
-        await connection.rollback();
-        callback('لقد تم استخدام جميع الاشتراكات التجريبية المجانية لهذا اليوم ⚠️.', false);
-      } else {
-        const expiryDateTime = await activateFreeTrial(userId, connection);
-        await connection.execute('UPDATE trial_usage SET count = count + 1 WHERE id = 1');
-        await connection.commit();
-        userSubscriptions.set(userId, true); // تحديث حالة الاشتراك في الذاكرة المؤقتة
-        cache.set(userId, true); // تحديث التخزين المؤقت
-        callback('تم تفعيل الاشتراك التجريبي المجاني ليوم واحد 🎉\n\n\n\nاختر القنوات التي تريد الانضمام لها', true);
-        // إعادة إرسال رسالة /start بعد التفعيل لضمان تحديث القائمة
-        //bot.sendMessage(userId, '/start');
-      }
-    } else {
-      const [trialCountResult] = await connection.execute('SELECT count FROM trial_usage WHERE id = 1 FOR UPDATE');
-      const trialCount = trialCountResult[0].count;
-      if (trialCount >= 10) {
-        await connection.rollback();
-        callback('لقد تم استخدام جميع الاشتراكات التجريبية المجانية لهذا اليوم ⚠️.\n\n يوميا الساعه 10 صباحا سيتم اعادة تعيين التجربة الى اول 10 شخص', false);
-      } else {
-        const expiryDateTime = await activateFreeTrial(userId, connection);
-        await connection.execute('UPDATE trial_usage SET count = count + 1 WHERE id = 1');
-        await connection.commit();
-        userSubscriptions.set(userId, true); // تحديث حالة الاشتراك في الذاكرة المؤقتة
-        cache.set(userId, true); // تحديث التخزين المؤقت
-        callback('تم تفعيل الاشتراك التجريبي المجاني ليوم واحد 🎉\n\n\n\nاختر القنوات التي تريد الانضمام لها', true);
-      }
-    }
-  } catch (err) {
-    if (connection) await connection.rollback();
-    console.error('Error handling free trial:', err);
-    callback('⚠️ حدث خطأ أثناء تفعيل الاشتراك التجريبي.', false);
-  } finally {
-    if (connection) connection.release();
-  }
-}
 
+// التعامل مع التجربة المجانية
 // تفعيل التجربة المجانية
-async function activateFreeTrial(userId, connection) {
-  const startDate = new Date().toISOString().split('T')[0];
-  let expiryDate = new Date();
-  expiryDate.setHours(23, 59, 59, 999); // تعيين وقت الانتهاء ليكون في نهاية اليوم الحالي
-  const insertOrUpdateQuery = `
-    INSERT INTO users (id, activated, subscriptionType, startDate, expiryDate, trial_used)
-    VALUES (?, ?, ?, ?, ?, ?)
-    ON DUPLICATE KEY UPDATE activated = VALUES(activated), subscriptionType = VALUES(subscriptionType), startDate = VALUES(startDate), expiryDate = VALUES(expiryDate), trial_used = VALUES(trial_used)
-  `;
-  await connection.execute(insertOrUpdateQuery, [userId, true, '1 يوم', startDate, expiryDate.toISOString().split('T')[0], true]);
-  return expiryDate; // إرجاع تاريخ الانتهاء لاستخدامه في التحديث
-}
 // جدولة إعادة تعيين العداد عند الساعة 10 ظهرًا
-cron.schedule('0 10 * * *', async () => {
-  let connection;
-  try {
-    connection = await pool.getConnection();
-    await connection.execute('UPDATE trial_usage SET count = 0 WHERE id = 1');
-  } catch (err) {
-    console.error('Error resetting trial count:', err);
-  } finally {
-    if (connection) connection.release();
-  }
-});
+
 
 const productCache = new NodeCache({ stdTTL: 43200 }); // مدة التخزين المؤقت 43200 ثانية (12 ساعة)
 

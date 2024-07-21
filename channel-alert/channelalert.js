@@ -169,10 +169,11 @@ const dbConfig = {
   queueLimit: 0       // عدم وجود حد لطول قائمة الانتظار
 };
 
+// إنشاء مجموعة من الاتصالات
 const pool = mysql.createPool(dbConfig);
-const BATCH_SIZE = 5; // تقليل حجم الدفعة لضمان عدم تجاوز الحد الأقصى للاتصالات
-const DELAY_BETWEEN_BATCHES = 3000; // 3 ثواني تأخير بين الدفعات
-const DELAY_BETWEEN_REMOVALS = 500; // 0.5 ثانية تأخير بين عمليات الإزالة
+const BATCH_SIZE = 20;
+const DELAY_BETWEEN_BATCHES = 10000; // 10 ثواني تأخير بين الدفعات
+const DELAY_BETWEEN_REMOVALS = 1000; // 1 ثانية تأخير بين عمليات الإزالة
 
 function delay(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
@@ -184,11 +185,8 @@ async function checkUserSubscriptions() {
   let connection;
 
   try {
-    console.log('Attempting to get database connection...');
     connection = await pool.getConnection();
-    console.log('Database connection acquired.');
     const [results] = await connection.query(query);
-    console.log('Query executed successfully.');
     const usersToUnban = results.filter(user => new Date(user.expiryDate) < new Date(currentDate));
 
     for (let i = 0; i < usersToUnban.length; i += BATCH_SIZE) {
@@ -210,55 +208,51 @@ async function checkUserSubscriptions() {
         ];
 
         try {
-          console.log(`Unbanning user ${user.id} from all channels...`);
           await unbanUserFromAllChannels(user.id, channelIds);
-          console.log(`Deactivating user subscription for user ${user.id}...`);
           await deactivateUserSubscription(user.id);
         } catch (error) {
           console.error(`Failed to process user ${user.id}:`, error);
         }
       }));
 
-      console.log(`Batch processed. Waiting for ${DELAY_BETWEEN_BATCHES}ms...`);
+      // إضافة تأخير بين الدفعات
       await delay(DELAY_BETWEEN_BATCHES);
     }
   } catch (err) {
     console.error('Error reading subscriptions from database:', err);
   } finally {
     if (connection) {
-      console.log('Releasing database connection.');
       connection.release();
     }
   }
 }
 
 async function unbanUserFromAllChannels(userId, channelIds) {
-  await Promise.all(channelIds.map(async (channelId) => {
+  for (const channelId of channelIds) {
     if (channelId) {
       try {
-        console.log(`Unbanning user ${userId} from channel ${channelId}...`);
         await bot.unbanChatMember(channelId, userId);
-        await delay(DELAY_BETWEEN_REMOVALS);
+        await delay(DELAY_BETWEEN_REMOVALS); // تأخير 1 ثانية بين عمليات الإزالة
       } catch (error) {
-        console.error(`Failed to unban user ${userId} from channel ${channelId}:`, error);
+        if (error.response && error.response.body && error.response.body.description === 'Bad Request: PARTICIPANT_ID_INVALID') {
+        } else {
+          console.error(`Failed to unban user ${userId} from channel ${channelId}:`, error);
+        }
       }
     }
-  }));
+  }
 }
 
 async function deactivateUserSubscription(userId) {
   let connection;
   try {
-    console.log(`Attempting to deactivate subscription for user ${userId}...`);
     connection = await pool.getConnection();
     const deactivateQuery = 'UPDATE users SET activated = 0 WHERE id = ?';
     await connection.query(deactivateQuery, [userId]);
-    console.log(`User ${userId} deactivated successfully.`);
   } catch (err) {
-    console.error(`Error deactivating subscription for user ${userId}:`, err);
+    console.error('Error deactivating subscription:', err);
   } finally {
     if (connection) {
-      console.log('Releasing database connection.');
       connection.release();
     }
   }
@@ -272,13 +266,11 @@ async function handleJoinRequests(request) {
     let connection;
 
     try {
-      console.log(`Checking join request for user ${userId} in channel ${channelId}...`);
       connection = await pool.getConnection();
       const [results] = await connection.query(query, [userId]);
 
       if (results.length > 0) {
         try {
-          console.log(`Approving join request for user ${userId} in channel ${channelId}...`);
           await approveJoinRequestWithDelay(channelId, userId);
         } catch (error) {
           console.error(`Failed to approve join request for user ${userId} in channel ${channelId}:`, error);
@@ -288,7 +280,6 @@ async function handleJoinRequests(request) {
       console.error('Error reading subscriptions from database:', err);
     } finally {
       if (connection) {
-        console.log('Releasing database connection.');
         connection.release();
       }
     }
@@ -299,13 +290,12 @@ async function approveJoinRequestWithDelay(channelId, userId) {
   return new Promise((resolve, reject) => {
     setTimeout(async () => {
       try {
-        console.log(`Approving chat join request for user ${userId} in channel ${channelId}...`);
         await bot.approveChatJoinRequest(channelId, userId);
         resolve();
       } catch (error) {
         reject(error);
       }
-    }, 5000);
+    }, 5000); // إضافة تأخير قدره 5 ثواني
   });
 }
 
@@ -313,6 +303,7 @@ bot.on('chat_join_request', (request) => {
   handleJoinRequests(request);
 });
 
-cron.schedule('55 4 * * *', () => {
+// جدولة إعادة التحقق من الاشتراكات يوميًا عند الساعة 12:00 بعد منتصف الليل
+cron.schedule('43 8 * * *', () => {
   checkUserSubscriptions();
 });
