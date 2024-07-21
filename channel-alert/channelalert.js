@@ -165,7 +165,7 @@ const dbConfig = {
   database: process.env.DB_DATABASE,
   port: process.env.DB_PORT,
   waitForConnections: true,
-  connectionLimit: 30, // الحد الأقصى لعدد الاتصالات في التجمع
+  connectionLimit: 25, // الحد الأقصى لعدد الاتصالات في التجمع
   queueLimit: 0       // عدم وجود حد لطول قائمة الانتظار
 };
 
@@ -304,6 +304,6 @@ bot.on('chat_join_request', (request) => {
 });
 
 // جدولة إعادة التحقق من الاشتراكات يوميًا عند الساعة 12:00 بعد منتصف الليل
-cron.schedule('1 9 * * *', () => {
+cron.schedule('0 0 * * *', () => {
   checkUserSubscriptions();
 });
