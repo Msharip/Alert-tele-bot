@@ -16,15 +16,29 @@ const dbConfig = {
   queueLimit: 0              // عدم وجود حد لطول قائمة الانتظار
 };
 const token = process.env.TOKEN4;
+const url = 'https://allbot-test-v2-3a0e0fd50f61.herokuapp.com/';
+const bot = new TelegramBot(token, {
+  webHook: {
+    url: url + 'webhook',
+  }
+});
+
+// قم بتعطيل هذا الجزء أو حذفه
+/*
 const bot = new TelegramBot(token, {
   polling: {
-    interval: 3000, // زيادة الفاصل الزمني إلى 3 ثواني
+    interval: 3000,
     autoStart: true,
     params: {
-      timeout: 20 // زيادة مهلة الانتظار إلى 20 ثانية
+      timeout: 20
     }
   }
-});const pool = mysql.createPool(dbConfig);
+});
+*/
+
+// إعداد webhook
+bot.setWebHook(url + 'webhook');
+const pool = mysql.createPool(dbConfig);
 const activeUsers = new Map();
 const userClicks = new Map();
 const rateLimitMap = new Map(); // لتتبع آخر وقت تلقى فيه المستخدم أمر /start

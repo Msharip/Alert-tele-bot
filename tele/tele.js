@@ -30,15 +30,7 @@ const urls = [
 
 const token = '6749756089:AAFMCjy0-85EkyQIrzC4tJU5jIyFJvpnLEI';
 const chatId = '-1002122565496';
-const bot = new TelegramBot(token, {
-  polling: {
-    interval: 3000, // زيادة الفاصل الزمني إلى 3 ثواني
-    autoStart: true,
-    params: {
-      timeout: 20 // زيادة مهلة الانتظار إلى 20 ثانية
-    }
-  }
-});
+const bot = new TelegramBot(token, { polling: true });
 const productCooldown = 14 * 60 * 1000; // فترة التهدئة لكل منتج على حدة: 25 دقيقة بالمللي ثانية
 let productStatus = {};
 

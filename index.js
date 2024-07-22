@@ -2,10 +2,10 @@ const express = require('express');
 const app = express();
 
 //SUB-CHANNELES
-require('./channel-alert/channelalert.js');
+//require('./channel-alert/channelalert.js');
 
 // AXIOS checking
-require('./tele/tele.js');
+//require('./tele/tele.js');
 
 // SUB-BOT
 require('./sub-bot/sub.js');
