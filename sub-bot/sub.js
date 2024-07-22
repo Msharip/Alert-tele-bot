@@ -11,23 +11,20 @@ const dbConfig = {
   password: process.env.DB_PASSWORD,
   database: process.env.DB_DATABASE,
   port: process.env.DB_PORT,
-  waitForConnections: true,  // الانتظار للاتصالات عند الوصول إلى الحد الأقصى
-  connectionLimit: 30,       // الحد الأقصى لعدد الاتصالات في التجمع
-  queueLimit: 0              // عدم وجود حد لطول قائمة الانتظار
+  waitForConnections: true,
+  connectionLimit: 25,
+  queueLimit: 0
 };
 const token = process.env.TOKEN4;
 const bot = new TelegramBot(token);
+bot.setWebHook('https://allbot-test-v2-3a0e0fd50f61.herokuapp.com/webhook');
+
 const pool = mysql.createPool(dbConfig);
 const activeUsers = new Map();
 const userClicks = new Map();
 const rateLimitMap = new Map();
 const userSubscriptions = new Map();
 
-// إعداد Webhook
-const webhookUrl = `${process.env.WEBHOOK_URL}/bot${token}`;
-
-bot.setWebHook(webhookUrl);
-// تفعيل اشتراك المستخدم
 async function activateUserSubscription(userId, code, duration, callback) {
   let connection;
   try {
@@ -60,8 +57,8 @@ async function activateUserSubscription(userId, code, duration, callback) {
     }
 
     await connection.execute('UPDATE users SET activated = true WHERE id = ?', [userId]);
-    userSubscriptions.set(userId, true); // تحديث حالة الاشتراك في الذاكرة المؤقتة
-    cache.set(userId, true); // تحديث التخزين المؤقت
+    userSubscriptions.set(userId, true);
+    cache.set(userId, true);
   } catch (err) {
     if (connection) await connection.rollback();
     console.error('Error activating subscription:', err);
@@ -71,7 +68,6 @@ async function activateUserSubscription(userId, code, duration, callback) {
   }
 }
 
-// تمديد اشتراك المستخدم
 async function extendUserSubscription(connection, userId, code, duration, callback) {
   try {
     const [existingUsers] = await connection.execute('SELECT * FROM users WHERE id = ?', [userId]);
@@ -114,28 +110,26 @@ async function extendUserSubscription(connection, userId, code, duration, callba
     await deleteActivationCode(connection, code);
     await connection.commit();
     callback(`**تم تمديد اشتراكك بنجاح لمدة ${Math.abs(duration)} ${duration < 0 ? 'يوم' : 'أشهر'}.**\n\n الآن مجموع الاشتراك هو ${totalDuration} 🎉`);
-    cache.set(userId, true); // تحديث التخزين المؤقت
+    cache.set(userId, true);
   } catch (err) {
     console.error('Error extending subscription:', err);
     callback('⚠️ حدث خطأ أثناء تمديد الاشتراك.');
   }
 }
-// حذف كود التفعيل
+
 async function deleteActivationCode(connection, code) {
   const deleteQuery = 'DELETE FROM activationcodes WHERE activation_code = ?';
   await connection.execute(deleteQuery, [code]);
 }
-const cache = new NodeCache({ stdTTL: 7200 }); // مدة التخزين المؤقت ساعتين (7200 ثانية)
 
-// دالة للتحقق من حالة التفعيل
+const cache = new NodeCache({ stdTTL: 7200 });
+
 async function isUserSubscribed(userId) {
-  // إذا كانت حالة التفعيل مخزنة وصالحة، قم بإعادتها مباشرة
   const cachedActivation = cache.get(userId);
   if (cachedActivation !== undefined) {
     return cachedActivation;
   }
 
-  // تحقق من قاعدة البيانات إذا لم تكن الحالة مخزنة
   let connection;
   try {
     connection = await pool.getConnection();
@@ -143,10 +137,10 @@ async function isUserSubscribed(userId) {
     if (results.length > 0) {
       const user = results[0];
       const isActivated = user.activated === 1;
-      cache.set(userId, isActivated); // تحديث حالة التفعيل في الذاكرة المؤقتة
+      cache.set(userId, isActivated);
       return isActivated;
     } else {
-      cache.set(userId, false); // إذا لم يكن هناك سجل للمستخدم
+      cache.set(userId, false);
       return false;
     }
   } catch (err) {
@@ -156,7 +150,7 @@ async function isUserSubscribed(userId) {
     if (connection) connection.release();
   }
 }
-// لوحة مفاتيح قنوات التنبيهات
+
 const notificationChannelsKeyboard = {
   inline_keyboard: [
     [
@@ -187,23 +181,20 @@ const notificationChannelsKeyboard = {
     ]
   ]
 };
-// لوحة مفاتيح الدعم الفني والعودة
+
 const userMessagesMap = new Map();
 bot.onText(/\/start/, async (msg) => {
   const chatId = msg.chat.id;
   const userId = msg.from.id;
   const currentTime = new Date().getTime();
   const lastStartTime = rateLimitMap.get(userId) || 0;
-  // تحديد فترة السماح بالمللي ثانية (مثلاً 20 ثانية)
   const timeLimit = 20000;
   if (currentTime - lastStartTime < timeLimit) {
     bot.sendMessage(chatId, '⚠️ تجنب ارسال امر - /start - متكرر\n\n تم ايقاف الامر موقتا لمده من الوقت');
     return;
   }
-  // تحديث آخر وقت تلقى فيه المستخدم أمر /start
   rateLimitMap.set(userId, currentTime);
   userClicks.set(userId, 0);
-  // حذف الرسائل السابقة
   if (userMessagesMap.has(userId)) {
     const previousMessages = userMessagesMap.get(userId);
     previousMessages.forEach(messageId => {
@@ -283,7 +274,6 @@ bot.onText(/\/start/, async (msg) => {
           parse_mode: 'Markdown'
         }).catch((error) => {
           if (error.response.body.error_code === 400 && error.response.body.description.includes("message is not modified")) {
-            // لا يوجد تغيير في الرسالة
           }
         });
       }
@@ -448,7 +438,6 @@ bot.on('message', async (msg) => {
           parse_mode: 'Markdown'
         });
 
-        // حذف الرسائل السابقة بعد التفعيل أو التمديد بنجاح
         if (userMessagesMap.has(userId)) {
           const previousMessages = userMessagesMap.get(userId);
           previousMessages.forEach(messageId => {
@@ -468,7 +457,7 @@ bot.on('message', async (msg) => {
     }
   }
 });
-// الحصول على حالة الاشتراك
+
 async function getSubscriptionStatus(userId, callback) {
   let connection;
   try {
@@ -491,11 +480,9 @@ async function getSubscriptionStatus(userId, callback) {
     if (connection) connection.release();
   }
 }
-// تفعيل الاشتراك
+
 async function activateSubscription(userId, code, callback) {
   let connection;
-
-        
   try {
     connection = await pool.getConnection();
     const [results] = await connection.execute('SELECT * FROM activationcodes WHERE activation_code = ?', [code]);
@@ -503,8 +490,6 @@ async function activateSubscription(userId, code, callback) {
       const duration = results[0].duration_in_months;
       await activateUserSubscription(userId, code, duration, async (message) => {
         await callback(message);
-        
-        // حذف الرسائل السابقة بعد تفعيل الاشتراك بنجاح
         if (userMessagesMap.has(userId)) {
           const previousMessages = userMessagesMap.get(userId);
           previousMessages.forEach(messageId => {
@@ -526,18 +511,12 @@ async function activateSubscription(userId, code, callback) {
   }
 }
 
-// التعامل مع التجربة المجانية
-// تفعيل التجربة المجانية
-// جدولة إعادة تعيين العداد عند الساعة 10 ظهرًا
-
-
-const productCache = new NodeCache({ stdTTL: 43200 }); // مدة التخزين المؤقت 43200 ثانية (12 ساعة)
+const productCache = new NodeCache({ stdTTL: 43200 });
 
 async function getProductAvailability(callback) {
-  // تحقق من وجود البيانات في الكاش
   const cachedData = productCache.get("productAvailability");
   if (cachedData) {
-    callback(cachedData); // إعادة البيانات المخزنة في الكاش
+    callback(cachedData);
     return;
   }
 
@@ -565,7 +544,7 @@ async function getProductAvailability(callback) {
       const notificationTime = new Date(row.notification_time);
       const dayName = notificationTime.toLocaleDateString('ar-SA', { weekday: 'long' });
       const formattedTime = notificationTime.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
-      const formattedDate = notificationTime.toLocaleDateString('en-CA'); // 2024-07-16
+      const formattedDate = notificationTime.toLocaleDateString('en-CA');
 
       if (!daysAdded.has(dayName)) {
         response += `${dayName}\nالساعة : ${formattedTime} 🕒 \n\n`;
@@ -573,7 +552,6 @@ async function getProductAvailability(callback) {
       }
     });
 
-    // حفظ النتائج في الكاش
     productCache.set("productAvailability", response);
     callback(response);
   } catch (err) {
@@ -584,7 +562,6 @@ async function getProductAvailability(callback) {
   }
 }
 
-// وظيفة لحذف الإشعارات القديمة
 async function deleteOldNotifications() {
   let connection;
   try {
@@ -604,5 +581,4 @@ async function deleteOldNotifications() {
   }
 }
 
-// استدعاء وظيفة حذف الإشعارات القديمة بشكل دوري (كل 24 ساعة)
 setInterval(deleteOldNotifications, 24 * 60 * 60 * 1000);

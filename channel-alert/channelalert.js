@@ -7,7 +7,6 @@ const mysql = require('mysql2/promise');
 const moment = require('moment-timezone');
 require('dotenv').config();
 
-// تعريف وظيفة delay في بداية الكود
 function delay(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
@@ -53,9 +52,11 @@ const channels = {
 
 const mainChannelId = process.env.CHAT_ID_MAIN;
 const token = process.env.TOKEN3;
-const bot = new TelegramBot(token, { polling: true });
-const productCooldown = 14 * 60 * 1000; // فترة التهدئة الفردية (14 دقيقة)
-const firstNotificationSaved = false; // متغير للتحقق مما إذا تم حفظ أول إشعار أم لا
+const bot = new TelegramBot(token);
+bot.setWebHook('https://allbot-test-v2-3a0e0fd50f61.herokuapp.com/webhook');
+
+const productCooldown = 14 * 60 * 1000;
+const firstNotificationSaved = false;
 
 const productStatus = {};
 
@@ -122,22 +123,21 @@ async function checkProductAvailability(url) {
         }, productCooldown);
 
         if (!firstNotificationSaved) {
-          // إضافة وقت أول إشعار إلى قاعدة البيانات لأول منتج فقط
           const connection = await pool.getConnection();
           try {
             const query = 'INSERT INTO product_notifications (product_url, notification_time) VALUES (?, ?)';
             await connection.query(query, [url, localTime]);
-            firstNotificationSaved = true; // تعيين المتغير بعد حفظ أول إشعار
+            firstNotificationSaved = true;
           } finally {
             connection.release();
           }
         }
       } else if (isUnavailable) {
-        // إذا كان المنتج غير متوفر، لا نفعل شيئاً
         productStatus[url].isAvailable = false;
       }
     }
   } catch (error) {
+    console.error(error);
   }
 }
 
@@ -165,19 +165,14 @@ const dbConfig = {
   database: process.env.DB_DATABASE,
   port: process.env.DB_PORT,
   waitForConnections: true,
-  connectionLimit: 25, // الحد الأقصى لعدد الاتصالات في التجمع
-  queueLimit: 0       // عدم وجود حد لطول قائمة الانتظار
+  connectionLimit: 25,
+  queueLimit: 0
 };
 
-// إنشاء مجموعة من الاتصالات
 const pool = mysql.createPool(dbConfig);
 const BATCH_SIZE = 20;
-const DELAY_BETWEEN_BATCHES = 10000; // 10 ثواني تأخير بين الدفعات
-const DELAY_BETWEEN_REMOVALS = 1000; // 1 ثانية تأخير بين عمليات الإزالة
-
-function delay(ms) {
-  return new Promise(resolve => setTimeout(resolve, ms));
-}
+const DELAY_BETWEEN_BATCHES = 10000;
+const DELAY_BETWEEN_REMOVALS = 1000;
 
 async function checkUserSubscriptions() {
   const currentDate = new Date().toISOString().split('T')[0];
@@ -215,7 +210,6 @@ async function checkUserSubscriptions() {
         }
       }));
 
-      // إضافة تأخير بين الدفعات
       await delay(DELAY_BETWEEN_BATCHES);
     }
   } catch (err) {
@@ -232,7 +226,7 @@ async function unbanUserFromAllChannels(userId, channelIds) {
     if (channelId) {
       try {
         await bot.unbanChatMember(channelId, userId);
-        await delay(DELAY_BETWEEN_REMOVALS); // تأخير 1 ثانية بين عمليات الإزالة
+        await delay(DELAY_BETWEEN_REMOVALS);
       } catch (error) {
         if (error.response && error.response.body && error.response.body.description === 'Bad Request: PARTICIPANT_ID_INVALID') {
         } else {
@@ -295,7 +289,7 @@ async function approveJoinRequestWithDelay(channelId, userId) {
       } catch (error) {
         reject(error);
       }
-    }, 5000); // إضافة تأخير قدره 5 ثواني
+    }, 5000);
   });
 }
 
@@ -303,7 +297,6 @@ bot.on('chat_join_request', (request) => {
   handleJoinRequests(request);
 });
 
-// جدولة إعادة التحقق من الاشتراكات يوميًا عند الساعة 12:00 بعد منتصف الليل
 cron.schedule('0 0 * * *', () => {
   checkUserSubscriptions();
 });
