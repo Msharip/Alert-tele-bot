@@ -53,7 +53,7 @@ const channels = {
 
 const mainChannelId = process.env.CHAT_ID_MAIN;
 const token = process.env.TOKEN3;
-const bot = new TelegramBot(token, { polling: { interval: 3000 } }); // 2 ثانية
+const bot = new TelegramBot(token, { polling: { interval: 2000 } }); // 2 ثانية
 const productCooldown = 14 * 60 * 1000; // فترة التهدئة الفردية (14 دقيقة)
 const firstNotificationSaved = false; // متغير للتحقق مما إذا تم حفظ أول إشعار أم لا
 
