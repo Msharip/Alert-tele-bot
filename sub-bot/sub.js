@@ -16,8 +16,15 @@ const dbConfig = {
   queueLimit: 0              // عدم وجود حد لطول قائمة الانتظار
 };
 const token = process.env.TOKEN4;
-const bot = new TelegramBot(token, { polling: true });
-const pool = mysql.createPool(dbConfig);
+const bot = new TelegramBot(token, {
+  polling: {
+    interval: 3000, // زيادة الفاصل الزمني إلى 3 ثواني
+    autoStart: true,
+    params: {
+      timeout: 20 // زيادة مهلة الانتظار إلى 20 ثانية
+    }
+  }
+});const pool = mysql.createPool(dbConfig);
 const activeUsers = new Map();
 const userClicks = new Map();
 const rateLimitMap = new Map(); // لتتبع آخر وقت تلقى فيه المستخدم أمر /start
