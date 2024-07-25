@@ -6,16 +6,15 @@ const { TwitterApi } = require('twitter-api-v2');
 const path = require('path');
 
 const productNames = {
-
-
   'https://www.dzrt.com/ar/icy-rush.html': { ar: 'آيسي رش', en: 'icy-rush' },
   'https://www.dzrt.com/ar/seaside-frost.html': { ar: 'سي سايد فروست', en: 'seaside-frost' },
   'https://www.dzrt.com/ar/highland-berries.html': { ar: 'هايلاند بيريز', en: 'highland-berries' },
   'https://www.dzrt.com/ar/garden-mint.html': { ar: 'جاردن منت', en: 'garden-mint' },
   'https://www.dzrt.com/ar/mint-fusion.html': { ar: 'منت فيوجن', en: 'mint-fusion' },
-  'https://www.dzrt.com/ar/haila.html': { ar: ' هيلة', en: 'haila' },
-  'https://www.dzrt.com/ar/samra.html': { ar: 'سمرة ', en: 'samra' },
+  'https://www.dzrt.com/ar/haila.html': { ar: 'هيلة', en: 'haila' },
+  'https://www.dzrt.com/ar/samra.html': { ar: 'سمرة', en: 'samra' },
 };
+
 const urls = [
   'https://www.dzrt.com/ar/icy-rush.html',
   'https://www.dzrt.com/ar/seaside-frost.html',
@@ -24,14 +23,12 @@ const urls = [
   'https://www.dzrt.com/ar/mint-fusion.html',
   'https://www.dzrt.com/ar/haila.html',
   'https://www.dzrt.com/ar/samra.html',
-
 ];
-
 
 const token = '6749756089:AAFMCjy0-85EkyQIrzC4tJU5jIyFJvpnLEI';
 const chatId = '-1002122565496';
-const bot = new TelegramBot(token, { polling: { interval: 2000 } }); // 2 ثانية
-const productCooldown = 14 * 60 * 1000; // فترة التهدئة لكل منتج على حدة: 25 دقيقة بالمللي ثانية
+const bot = new TelegramBot(token, { polling: { interval: 2000 } });
+const productCooldown = 14 * 60 * 1000;
 let productStatus = {};
 
 urls.forEach(url => {
@@ -51,27 +48,29 @@ async function checkProductAvailability(url) {
     const $ = cheerio.load(data);
     const isUnavailable = $('div.stock.unavailable span').length > 0;
     const currentTime = Date.now();
-    
+
     if (productNames[url]) {
       const productNameAr = productNames[url].ar;
       const imageUrl = path.join(__dirname, '..', 'images', `${productNames[url].en}.png`);
 
       if (!isUnavailable && (currentTime - productStatus[url].individualCooldownTime > productCooldown)) {
         // المنتج متوفر الآن وفترة التهدئة الفردية قد انقضت
-        const message = `*${productNameAr}* - متوفر الآن ✅ \n[ أضغط هنا - اضافة الى السلة ](${url})`;
-        const sentMessage = await bot.sendPhoto(chatId, imageUrl, { caption: message, parse_mode: 'Markdown' });
-        
-        productStatus[url] = {
-          isAvailable: true,
-          lastNotificationTime: currentTime,
-          messageId: sentMessage.message_id,
-          individualCooldownTime: currentTime
-        };
+        setTimeout(async () => {
+          const message = `*${productNameAr}* - متوفر الآن ✅ \n[ أضغط هنا - اضافة الى السلة ](${url})`;
+          const sentMessage = await bot.sendPhoto(chatId, imageUrl, { caption: message, parse_mode: 'Markdown' });
 
-        // نشر تغريدة على تويتر
-        const tweetMessage = `${productNameAr} - متوفر الآن ✅! #دزرت #تنبيه \n${url}`;
-        const mediaId = await twitterClient.v1.uploadMedia(imageUrl); // تحميل الصورة إلى تويتر
-        await twitterClient.v2.tweet({ text: tweetMessage, media: { media_ids: [mediaId] } });
+          productStatus[url] = {
+            isAvailable: true,
+            lastNotificationTime: currentTime,
+            messageId: sentMessage.message_id,
+            individualCooldownTime: currentTime
+          };
+
+          // نشر تغريدة على تويتر
+          const tweetMessage = `${productNameAr} - متوفر الآن ✅! #دزرت #تنبيه \n${url}`;
+          const mediaId = await twitterClient.v1.uploadMedia(imageUrl); // تحميل الصورة إلى تويتر
+          await twitterClient.v2.tweet({ text: tweetMessage, media: { media_ids: [mediaId] } });
+        }, 30000); // تأخير لمدة 40 ثانية
 
       } else if (isUnavailable && productStatus[url].isAvailable) {
         // المنتج غير متوفر الآن ولكنه كان متوفرًا في الفحص السابق
@@ -79,6 +78,7 @@ async function checkProductAvailability(url) {
       }
     }
   } catch (error) {
+    console.error(error);
   }
 }
 
