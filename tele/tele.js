@@ -62,7 +62,6 @@ async function checkProductAvailability(url) {
       }
     }
   } catch (error) {
-    console.error(error);
   }
 }
 
