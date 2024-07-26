@@ -53,7 +53,39 @@ const channels = {
 
 const mainChannelId = process.env.CHAT_ID_MAIN;
 const token = process.env.TOKEN3;
-const bot = new TelegramBot(token, { polling: true });
+const bot = new TelegramBot(token, {
+  polling: {
+    interval: 3000, // فترة الاستطلاع بالمللي ثانية (3 ثواني)
+    autoStart: true,
+    params: {
+      timeout: 10 // مدة المهلة بالثواني
+    }
+  }
+});
+bot.on('polling_error', (error) => {
+  console.error(`Polling error: ${error.message}`);
+
+  if (error.response && error.response.statusCode === 502) {
+    // في حالة خطأ 502، انتظر لمدة قصيرة قبل إعادة المحاولة
+    setTimeout(() => {
+      console.log('Retrying polling after 10 seconds due to 502 error...');
+      bot.startPolling();
+    }, 10000); // إعادة المحاولة بعد 10 ثواني
+  } else if (error.response && error.response.statusCode === 429) {
+    // في حالة خطأ 429، انتظر لمدة أطول قبل إعادة المحاولة
+    const retryAfter = parseInt(error.response.headers['retry-after']) || 30;
+    console.log(`Retrying polling after ${retryAfter} seconds due to 429 error...`);
+    setTimeout(() => {
+      bot.startPolling();
+    }, retryAfter * 1000); // إعادة المحاولة بعد الفترة المحددة في retry-after
+  } else {
+    // لأخطاء أخرى، أعد المحاولة بعد فترة قصيرة
+    setTimeout(() => {
+      console.log('Retrying polling after 5 seconds due to other error...');
+      bot.startPolling();
+    }, 5000); // إعادة المحاولة بعد 5 ثواني
+  }
+});
 const productCooldown = 14 * 60 * 1000; // فترة التهدئة الفردية (14 دقيقة)
 const firstNotificationSaved = false; // متغير للتحقق مما إذا تم حفظ أول إشعار أم لا
 
@@ -165,7 +197,7 @@ const dbConfig = {
   database: process.env.DB_DATABASE,
   port: process.env.DB_PORT,
   waitForConnections: true,
-  connectionLimit: 25, // الحد الأقصى لعدد الاتصالات في التجمع
+  connectionLimit: 26, // الحد الأقصى لعدد الاتصالات في التجمع
   queueLimit: 0       // عدم وجود حد لطول قائمة الانتظار
 };
 
