@@ -68,20 +68,20 @@ bot.on('polling_error', (error) => {
   if (error.response && error.response.statusCode === 502) {
     // في حالة خطأ 502، انتظر لمدة قصيرة قبل إعادة المحاولة
     setTimeout(() => {
-      console.log('Retrying polling after 10 seconds due to 502 error...');
+      console.log('Retrying polling after 10 seconds due to 502 error...bot-1');
       bot.startPolling();
     }, 10000); // إعادة المحاولة بعد 10 ثواني
   } else if (error.response && error.response.statusCode === 429) {
     // في حالة خطأ 429، انتظر لمدة أطول قبل إعادة المحاولة
     const retryAfter = parseInt(error.response.headers['retry-after']) || 30;
-    console.log(`Retrying polling after ${retryAfter} seconds due to 429 error...`);
+    console.log(`Retrying polling after ${retryAfter} seconds due to 429 error...bot-1`);
     setTimeout(() => {
       bot.startPolling();
     }, retryAfter * 1000); // إعادة المحاولة بعد الفترة المحددة في retry-after
   } else {
     // لأخطاء أخرى، أعد المحاولة بعد فترة قصيرة
     setTimeout(() => {
-      console.log('Retrying polling after 5 seconds due to other error...');
+      console.log('Retrying polling after 5 seconds due to other error... bot-1');
       bot.startPolling();
     }, 5000); // إعادة المحاولة بعد 5 ثواني
   }
