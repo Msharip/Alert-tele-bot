@@ -28,10 +28,10 @@ const token = '6749756089:AAFMCjy0-85EkyQIrzC4tJU5jIyFJvpnLEI';
 const chatId = '-1002122565496';
 const bot = new TelegramBot(token, {
   polling: {
-    interval: 3000, // فترة الاستطلاع بالمللي ثانية (3 ثواني)
+    interval: 10000, // فترة الاستطلاع بالمللي ثانية (3 ثواني)
     autoStart: true,
     params: {
-      timeout: 10 // مدة المهلة بالثواني
+      timeout: 30 // مدة المهلة بالثواني
     }
   }
 });
@@ -44,7 +44,7 @@ bot.on('polling_error', (error) => {
     setTimeout(() => {
       console.log('Retrying polling after 10 seconds due to 502 error... bot-2');
       bot.startPolling();
-    }, 10000); // إعادة المحاولة بعد 10 ثواني
+    }, 20000); // إعادة المحاولة بعد 10 ثواني
   } else if (error.response && error.response.statusCode === 429) {
     // في حالة خطأ 429، انتظر لمدة أطول قبل إعادة المحاولة
     const retryAfter = parseInt(error.response.headers['retry-after']) || 30;
@@ -57,7 +57,7 @@ bot.on('polling_error', (error) => {
     setTimeout(() => {
       console.log('Retrying polling after 5 seconds due to other error... bot-2');
       bot.startPolling();
-    }, 5000); // إعادة المحاولة بعد 5 ثواني
+    }, 10000); // إعادة المحاولة بعد 5 ثواني
   }
 });// 2 ثانية
 const productCooldown = 14 * 60 * 1000; // فترة التهدئة لكل منتج على حدة: 25 دقيقة بالمللي ثانية
@@ -112,7 +112,7 @@ cron.schedule('* * * * *', () => {
   const now = new Date();
   const hour = now.getHours();
 
-  if (hour >= 13 && hour <= 22) {
+  if (hour >= 13 && hour <= 20) {
     checkAllUrls();
   }
 });
