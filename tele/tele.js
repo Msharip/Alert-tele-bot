@@ -2,6 +2,7 @@ const axios = require('axios');
 const cheerio = require('cheerio');
 const TelegramBot = require('node-telegram-bot-api');
 const cron = require('node-cron');
+const { TwitterApi } = require('twitter-api-v2');
 const path = require('path');
 
 const productNames = {
@@ -13,7 +14,6 @@ const productNames = {
   'https://www.dzrt.com/ar/haila.html': { ar: ' هيلة', en: 'haila' },
   'https://www.dzrt.com/ar/samra.html': { ar: 'سمرة ', en: 'samra' },
 };
-
 const urls = [
   'https://www.dzrt.com/ar/icy-rush.html',
   'https://www.dzrt.com/ar/seaside-frost.html',
@@ -26,45 +26,19 @@ const urls = [
 
 const token = '6749756089:AAFMCjy0-85EkyQIrzC4tJU5jIyFJvpnLEI';
 const chatId = '-1002122565496';
-const bot = new TelegramBot(token, {
-  polling: {
-    interval: 10000, // فترة الاستطلاع بالمللي ثانية (3 ثواني)
-    autoStart: true,
-    params: {
-      timeout: 30 // مدة المهلة بالثواني
-    }
-  }
-});
-
-bot.on('polling_error', (error) => {
-  console.error(`Polling error: ${error.message}`);
-  
-  if (error.response && error.response.statusCode === 502) {
-    // في حالة خطأ 502، انتظر لمدة قصيرة قبل إعادة المحاولة
-    setTimeout(() => {
-      console.log('Retrying polling after 10 seconds due to 502 error... bot-2');
-      bot.startPolling();
-    }, 20000); // إعادة المحاولة بعد 10 ثواني
-  } else if (error.response && error.response.statusCode === 429) {
-    // في حالة خطأ 429، انتظر لمدة أطول قبل إعادة المحاولة
-    const retryAfter = parseInt(error.response.headers['retry-after']) || 30;
-    console.log(`Retrying polling after ${retryAfter} seconds due to 429 error... bot-2`);
-    setTimeout(() => {
-      bot.startPolling();
-    }, retryAfter * 1000); // إعادة المحاولة بعد الفترة المحددة في retry-after
-  } else {
-    // لأخطاء أخرى، أعد المحاولة بعد فترة قصيرة
-    setTimeout(() => {
-      console.log('Retrying polling after 5 seconds due to other error... bot-2');
-      bot.startPolling();
-    }, 10000); // إعادة المحاولة بعد 5 ثواني
-  }
-});// 2 ثانية
-const productCooldown = 14 * 60 * 1000; // فترة التهدئة لكل منتج على حدة: 25 دقيقة بالمللي ثانية
+const bot = new TelegramBot(token, { polling: { interval: 2000 } }); // 2 ثانية
+const productCooldown = 14 * 60 * 1000; // فترة التهدئة لكل منتج على حدة: 14 دقيقة بالمللي ثانية
 let productStatus = {};
 
 urls.forEach(url => {
   productStatus[url] = { isAvailable: false, lastNotificationTime: 0, messageId: null, individualCooldownTime: 0 };
+});
+
+const twitterClient = new TwitterApi({
+  appKey: 'HrFfThKnzlbiuVXk2rBMfAndA',
+  appSecret: 'NCejLvJb5E8RFfXGGw6lqGH7yqXUhSvjZsZPBthAmFVhhAR095',
+  accessToken: '1791965388164440064-6p4RaldWOBEk4XLTlVaXrbT5C0JGVi',
+  accessSecret: 'y9R2GZa8ZylPT3pR1BEL3ZYD9A5maVPhv7DIstD9AT2cf',
 });
 
 async function checkProductAvailability(url) {
@@ -89,6 +63,12 @@ async function checkProductAvailability(url) {
           messageId: sentMessage.message_id,
           individualCooldownTime: currentTime
         };
+
+        // نشر تغريدة على تويتر
+        const tweetMessage = `${productNameAr} - متوفر الآن ✅! #دزرت #تنبيه \n${url}`;
+        const mediaId = await twitterClient.v1.uploadMedia(imageUrl); // تحميل الصورة إلى تويتر
+        await twitterClient.v2.tweet({ text: tweetMessage, media: { media_ids: [mediaId] } });
+
       } else if (isUnavailable && productStatus[url].isAvailable) {
         // المنتج غير متوفر الآن ولكنه كان متوفرًا في الفحص السابق
         productStatus[url].isAvailable = false;
@@ -112,7 +92,10 @@ cron.schedule('* * * * *', () => {
   const now = new Date();
   const hour = now.getHours();
 
-  if (hour >= 13 && hour <= 20) {
-    checkAllUrls();
+  if (hour >= 13 && hour <= 22) {
+    // تأخير التنفيذ لمدة 30 ثانية
+    setTimeout(() => {
+      checkAllUrls();
+    }, 30000); // 30000 ميلي ثانية = 30 ثانية
   }
 });
