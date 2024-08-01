@@ -53,15 +53,18 @@ const channels = {
 
 const mainChannelId = process.env.CHAT_ID_MAIN;
 const token = process.env.TOKEN3;
-const bot = new TelegramBot(token, {
-  polling: {
+const bot = new TelegramBot(token, { polling: true });
+
+/*  polling: {
     interval: 3000, // فترة الاستطلاع بالمللي ثانية (3 ثواني)
     autoStart: true,
     params: {
       timeout: 10 // مدة المهلة بالثواني
     }
   }
-});
+});*/
+
+
 bot.on('polling_error', (error) => {
   console.error(`Polling error: ${error.message}`);
 
