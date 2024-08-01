@@ -6,6 +6,8 @@ const { TwitterApi } = require('twitter-api-v2');
 const path = require('path');
 
 const productNames = {
+
+
   'https://www.dzrt.com/ar/icy-rush.html': { ar: 'آيسي رش', en: 'icy-rush' },
   'https://www.dzrt.com/ar/seaside-frost.html': { ar: 'سي سايد فروست', en: 'seaside-frost' },
   'https://www.dzrt.com/ar/highland-berries.html': { ar: 'هايلاند بيريز', en: 'highland-berries' },
@@ -22,12 +24,14 @@ const urls = [
   'https://www.dzrt.com/ar/mint-fusion.html',
   'https://www.dzrt.com/ar/haila.html',
   'https://www.dzrt.com/ar/samra.html',
+
 ];
+
 
 const token = '6749756089:AAFMCjy0-85EkyQIrzC4tJU5jIyFJvpnLEI';
 const chatId = '-1002122565496';
 const bot = new TelegramBot(token, { polling: { interval: 2000 } }); // 2 ثانية
-const productCooldown = 14 * 60 * 1000; // فترة التهدئة لكل منتج على حدة: 14 دقيقة بالمللي ثانية
+const productCooldown = 14 * 60 * 1000; // فترة التهدئة لكل منتج على حدة: 25 دقيقة بالمللي ثانية
 let productStatus = {};
 
 urls.forEach(url => {
@@ -88,14 +92,11 @@ async function checkAllUrls() {
   }
 }
 
-cron.schedule('* * * * *', () => {
+cron.schedule('*/2 * * * *', () => {
   const now = new Date();
   const hour = now.getHours();
 
   if (hour >= 13 && hour <= 22) {
-    // تأخير التنفيذ لمدة 30 ثانية
-    setTimeout(() => {
-      checkAllUrls();
-    }, 30000); // 30000 ميلي ثانية = 30 ثانية
+    checkAllUrls();
   }
 });
