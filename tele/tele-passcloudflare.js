@@ -1,9 +1,10 @@
-const axios = require('axios');
 const cheerio = require('cheerio');
 const TelegramBot = require('node-telegram-bot-api');
 const cron = require('node-cron');
 const { TwitterApi } = require('twitter-api-v2');
 const path = require('path');
+const cloudscraper = require('cloudscraper');
+
 
 const productNames = {
 
@@ -48,7 +49,7 @@ const twitterClient = new TwitterApi({
 
 async function checkProductAvailability(url) {
   try {
-    const { data } = await axios.get(url);
+    const data = await cloudscraper.get(url);
     const $ = cheerio.load(data);
     const isUnavailable = $('div.stock.unavailable span').length > 0;
     const currentTime = Date.now();
@@ -59,7 +60,7 @@ async function checkProductAvailability(url) {
 
       if (!isUnavailable && (currentTime - productStatus[url].individualCooldownTime > productCooldown)) {
         // المنتج متوفر الآن وفترة التهدئة الفردية قد انقضت
-        const message = `*${productNameAr}* - متوفر الآن ✅ \n[ أضغط هنا - اضافة الى السلة ](${url})`;
+        const message = `*${productNameAr}* - متوفر الآن ✅ \n[  الرابط - اضافة الى السلة ](${url})`;
         const sentMessage = await bot.sendPhoto(chatId, imageUrl, { caption: message, parse_mode: 'Markdown' });
         
         productStatus[url] = {
@@ -93,7 +94,7 @@ async function checkAllUrls() {
   }
 }
 
-cron.schedule('*/1 * * * *', () => {
+cron.schedule('* * * * * *', () => {
   const now = new Date();
   const hour = now.getHours();
 
