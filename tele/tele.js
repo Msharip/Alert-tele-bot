@@ -93,7 +93,7 @@ async function checkAllUrls() {
   }
 }
 
-cron.schedule('*/1 * * * *', () => {
+cron.schedule('* * * * *', () => {
   const now = new Date();
   const hour = now.getHours();
 
