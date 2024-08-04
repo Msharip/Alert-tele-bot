@@ -32,7 +32,7 @@ const token = '6749756089:AAFMCjy0-85EkyQIrzC4tJU5jIyFJvpnLEI';
 const chatId = '-1002122565496';
 const bot = new TelegramBot(token, { polling: true });
 
-const productCooldown = 14 * 60 * 1000; // فترة التهدئة لكل منتج على حدة: 25 دقيقة بالمللي ثانية
+const productCooldown = 50 * 60 * 1000; // فترة التهدئة لكل منتج على حدة: 25 دقيقة بالمللي ثانية
 let productStatus = {};
 
 urls.forEach(url => {
@@ -52,7 +52,7 @@ async function checkProductAvailability(url) {
     const $ = cheerio.load(data);
     const isUnavailable = $('div.stock.unavailable span').length > 0;
     const currentTime = Date.now();
-    
+
     if (productNames[url]) {
       const productNameAr = productNames[url].ar;
       const imageUrl = path.join(__dirname, '..', 'images', `${productNames[url].en}.png`);
@@ -60,19 +60,24 @@ async function checkProductAvailability(url) {
       if (!isUnavailable && (currentTime - productStatus[url].individualCooldownTime > productCooldown)) {
         // المنتج متوفر الآن وفترة التهدئة الفردية قد انقضت
         const message = `*${productNameAr}* - متوفر الآن ✅ \n[ أضغط هنا - اضافة الى السلة ](${url})`;
-        const sentMessage = await bot.sendPhoto(chatId, imageUrl, { caption: message, parse_mode: 'Markdown' });
-        
-        productStatus[url] = {
-          isAvailable: true,
-          lastNotificationTime: currentTime,
-          messageId: sentMessage.message_id,
-          individualCooldownTime: currentTime
-        };
 
-        // نشر تغريدة على تويتر
-        const tweetMessage = `${productNameAr} - متوفر الآن ✅! #دزرت #تنبيه \n${url}`;
-        const mediaId = await twitterClient.v1.uploadMedia(imageUrl); // تحميل الصورة إلى تويتر
-        await twitterClient.v2.tweet({ text: tweetMessage, media: { media_ids: [mediaId] } });
+        // إضافة تأخير قبل إرسال الإشعار
+        setTimeout(async () => {
+          const sentMessage = await bot.sendPhoto(chatId, imageUrl, { caption: message, parse_mode: 'Markdown' });
+
+          productStatus[url] = {
+            isAvailable: true,
+            lastNotificationTime: currentTime,
+            messageId: sentMessage.message_id,
+            individualCooldownTime: currentTime
+          };
+
+          // نشر تغريدة على تويتر
+          const tweetMessage = `${productNameAr} - متوفر الآن ✅! #دزرت #تنبيه \n${url}`;
+          const mediaId = await twitterClient.v1.uploadMedia(imageUrl); // تحميل الصورة إلى تويتر
+          await twitterClient.v2.tweet({ text: tweetMessage, media: { media_ids: [mediaId] } });
+
+        }, 50000); // تأخير لمدة 50 ثانية (50000 مللي ثانية)
 
       } else if (isUnavailable && productStatus[url].isAvailable) {
         // المنتج غير متوفر الآن ولكنه كان متوفرًا في الفحص السابق
