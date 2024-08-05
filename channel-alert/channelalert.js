@@ -89,7 +89,7 @@ bot.on('polling_error', (error) => {
     }, 5000); // إعادة المحاولة بعد 5 ثواني
   }
 });
-const productCooldown = 14 * 60 * 1000; // فترة التهدئة الفردية (14 دقيقة)
+const productCooldown = 20 * 60 * 1000; // فترة التهدئة الفردية (14 دقيقة)
 const firstNotificationSaved = false; // متغير للتحقق مما إذا تم حفظ أول إشعار أم لا
 
 const productStatus = {};
