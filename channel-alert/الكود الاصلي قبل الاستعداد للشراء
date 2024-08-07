@@ -55,30 +55,42 @@ const mainChannelId = process.env.CHAT_ID_MAIN;
 const token = process.env.TOKEN3;
 const bot = new TelegramBot(token, { polling: true });
 
+/*  polling: {
+    interval: 3000, // فترة الاستطلاع بالمللي ثانية (3 ثواني)
+    autoStart: true,
+    params: {
+      timeout: 10 // مدة المهلة بالثواني
+    }
+  }
+});*/
+
+
 bot.on('polling_error', (error) => {
   console.error(`Polling error: ${error.message}`);
 
   if (error.response && error.response.statusCode === 502) {
+    // في حالة خطأ 502، انتظر لمدة قصيرة قبل إعادة المحاولة
     setTimeout(() => {
       console.log('Retrying polling after 10 seconds due to 502 error...bot-1');
       bot.startPolling();
-    }, 10000);
+    }, 10000); // إعادة المحاولة بعد 10 ثواني
   } else if (error.response && error.response.statusCode === 429) {
+    // في حالة خطأ 429، انتظر لمدة أطول قبل إعادة المحاولة
     const retryAfter = parseInt(error.response.headers['retry-after']) || 30;
     console.log(`Retrying polling after ${retryAfter} seconds due to 429 error...bot-1`);
     setTimeout(() => {
       bot.startPolling();
-    }, retryAfter * 1000);
+    }, retryAfter * 1000); // إعادة المحاولة بعد الفترة المحددة في retry-after
   } else {
+    // لأخطاء أخرى، أعد المحاولة بعد فترة قصيرة
     setTimeout(() => {
       console.log('Retrying polling after 5 seconds due to other error... bot-1');
       bot.startPolling();
-    }, 5000);
+    }, 5000); // إعادة المحاولة بعد 5 ثواني
   }
 });
-
-const productCooldown = 20 * 60 * 1000; // فترة التهدئة الفردية (20 دقيقة)
-let firstNotificationSaved = false; // متغير للتحقق مما إذا تم حفظ أول إشعار أم لا
+const productCooldown = 20 * 60 * 1000; // فترة التهدئة الفردية (14 دقيقة)
+const firstNotificationSaved = false; // متغير للتحقق مما إذا تم حفظ أول إشعار أم لا
 
 const productStatus = {};
 
@@ -145,16 +157,18 @@ async function checkProductAvailability(url) {
         }, productCooldown);
 
         if (!firstNotificationSaved) {
+          // إضافة وقت أول إشعار إلى قاعدة البيانات لأول منتج فقط
           const connection = await pool.getConnection();
           try {
             const query = 'INSERT INTO product_notifications (product_url, notification_time) VALUES (?, ?)';
             await connection.query(query, [url, localTime]);
-            firstNotificationSaved = true;
+            firstNotificationSaved = true; // تعيين المتغير بعد حفظ أول إشعار
           } finally {
             connection.release();
           }
         }
       } else if (isUnavailable) {
+        // إذا كان المنتج غير متوفر، لا نفعل شيئاً
         productStatus[url].isAvailable = false;
       }
     }
@@ -163,103 +177,21 @@ async function checkProductAvailability(url) {
 }
 
 async function checkAllUrls() {
-  const now = new Date();
-  const hour = now.getHours();
-
-  if (hour >= 13 && hour <= 23) {
-    for (const url of urls) {
-      if (!productStatus[url].isNotifying) {
-        await checkProductAvailability(url);
-      }
+  for (const url of urls) {
+    if (!productStatus[url].isNotifying) {
+      await checkProductAvailability(url);
     }
   }
 }
 
-// جدولة فحص توفر المنتجات كل ثانية بين الساعة 13:00 والساعة 23:00
-cron.schedule('* * * * * *', checkAllUrls);
-
-const Before_availability = 'https://www.dzrt.com/ar/icy-rush.html';
-let previousPrice = 0;
-
-const getPriceValue = async () => {
-  try {
-    const response = await axios.get(Before_availability);
-    const pageContent = response.data;
-
-    const priceMatch = pageContent.match(/<meta property="product:price:amount" content="(\d+\.\d+|\d+)"/);
-
-    if (priceMatch && priceMatch[1]) {
-      return parseFloat(priceMatch[1]);
-    } else {
-      return null;
-    }
-  } catch (error) {
-    return null;
-  }
-};
-
-const checkForChange = async () => {
-  const newPrice = await getPriceValue();
-  if (newPrice === null) return;
-
-  if (previousPrice === 0 && newPrice !== 0) {
-    console.log('على وشك التوفر');
-    const message = 'المنتجات على وشك التوفر، أستعد لتسجيل الدخول';
-    await sendNotification(message);
-
-    for (const url of urls) {
-      const options = {
-        reply_markup: {
-          inline_keyboard: [
-            [
-              { text: 'تسجيل دخول 🔒', url: 'https://www.dzrt.com/ar/customer/account/login' }
-            ]
-          ]
-        }
-      };
-      try {
-        await bot.sendMessage(channels[url].chatId, message, options);
-      } catch (error) {
-        console.error(`Failed to send notification to ${channels[url].chatId}: ${error.message}`);
-      }
-    }
-    try {
-      await bot.sendMessage(mainChannelId, message, options);
-    } catch (error) {
-      console.error(`Failed to send notification to main channel ${mainChannelId}: ${error.message}`);
-    }
-
-    previousPrice = newPrice;
-  }
-};
-
-const sendNotification = async (message) => {
-  const options = {
-    reply_markup: {
-      inline_keyboard: [
-        [
-          { text: 'تسجيل دخول 🔒', url: 'https://www.dzrt.com/ar/customer/account/login' }
-        ]
-      ]
-    }
-  };
-
-  try {
-    await bot.sendMessage(mainChannelId, message, options);
-  } catch (error) {
-    console.error(`Failed to send notification: ${error.message}`);
-  }
-};
-
-// جدولة التحقق من تغير السعر كل دقيقة بين الساعة 13:00 والساعة 23:00
-cron.schedule('* * * * *', () => {
+cron.schedule('* * * * * *', () => {
   const now = new Date();
   const hour = now.getHours();
+
   if (hour >= 13 && hour <= 23) {
-    checkForChange();
+    checkAllUrls();
   }
 });
-
 
 const dbConfig = {
   host: process.env.DB_HOST,
