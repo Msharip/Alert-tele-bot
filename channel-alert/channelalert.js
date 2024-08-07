@@ -78,6 +78,7 @@ bot.on('polling_error', (error) => {
 
 const productCooldown = 20 * 60 * 1000; // فترة التهدئة الفردية (20 دقيقة)
 let firstNotificationSaved = false; // متغير للتحقق مما إذا تم حفظ أول إشعار أم لا
+let priceAlertSent = false; // متغير للتحقق مما إذا تم إرسال إشعار تغير السعر أم لا
 
 const productStatus = {};
 
@@ -107,7 +108,6 @@ const getPriceValue = async (url) => {
       return null;
     }
   } catch (error) {
-    console.error(`Error getting price value for ${url}: ${error.message}`);
     return null;
   }
 };
@@ -194,6 +194,8 @@ async function checkProductAvailability(url) {
 }
 
 const checkForChange = async () => {
+  if (priceAlertSent) return; // إذا تم إرسال الإشعار بالفعل، لا تقم بفحص التغيرات مرة أخرى
+
   for (const url of urls) {
     const newPrice = await getPriceValue(url);
     if (newPrice === null) continue;
@@ -227,6 +229,7 @@ const checkForChange = async () => {
         }
       }
 
+      priceAlertSent = true; // تعيين المتغير بعد إرسال أول إشعار
       break; // أرسل الإشعار مرة واحدة فقط
     }
 
@@ -284,6 +287,7 @@ initializePrices().then(() => {
 }).catch((error) => {
   console.error(`Failed to initialize prices: ${error.message}`);
 });
+
 
 const dbConfig = {
   host: process.env.DB_HOST,
