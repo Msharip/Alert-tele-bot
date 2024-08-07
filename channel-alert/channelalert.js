@@ -7,7 +7,6 @@ const mysql = require('mysql2/promise');
 const moment = require('moment-timezone');
 require('dotenv').config();
 
-// تعريف وظيفة delay في بداية الكود
 function delay(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
@@ -55,42 +54,30 @@ const mainChannelId = process.env.CHAT_ID_MAIN;
 const token = process.env.TOKEN3;
 const bot = new TelegramBot(token, { polling: true });
 
-/*  polling: {
-    interval: 3000, // فترة الاستطلاع بالمللي ثانية (3 ثواني)
-    autoStart: true,
-    params: {
-      timeout: 10 // مدة المهلة بالثواني
-    }
-  }
-});*/
-
-
 bot.on('polling_error', (error) => {
   console.error(`Polling error: ${error.message}`);
 
   if (error.response && error.response.statusCode === 502) {
-    // في حالة خطأ 502، انتظر لمدة قصيرة قبل إعادة المحاولة
     setTimeout(() => {
       console.log('Retrying polling after 10 seconds due to 502 error...bot-1');
       bot.startPolling();
-    }, 10000); // إعادة المحاولة بعد 10 ثواني
+    }, 10000);
   } else if (error.response && error.response.statusCode === 429) {
-    // في حالة خطأ 429، انتظر لمدة أطول قبل إعادة المحاولة
     const retryAfter = parseInt(error.response.headers['retry-after']) || 30;
     console.log(`Retrying polling after ${retryAfter} seconds due to 429 error...bot-1`);
     setTimeout(() => {
       bot.startPolling();
-    }, retryAfter * 1000); // إعادة المحاولة بعد الفترة المحددة في retry-after
+    }, retryAfter * 1000);
   } else {
-    // لأخطاء أخرى، أعد المحاولة بعد فترة قصيرة
     setTimeout(() => {
       console.log('Retrying polling after 5 seconds due to other error... bot-1');
       bot.startPolling();
-    }, 5000); // إعادة المحاولة بعد 5 ثواني
+    }, 5000);
   }
 });
-const productCooldown = 20 * 60 * 1000; // فترة التهدئة الفردية (14 دقيقة)
-const firstNotificationSaved = false; // متغير للتحقق مما إذا تم حفظ أول إشعار أم لا
+
+const productCooldown = 20 * 60 * 1000; // فترة التهدئة الفردية (20 دقيقة)
+let firstNotificationSaved = false; // متغير للتحقق مما إذا تم حفظ أول إشعار أم لا
 
 const productStatus = {};
 
@@ -103,6 +90,36 @@ urls.forEach(url => {
     individualCooldownTime: 0
   };
 });
+
+let previousPrices = {};
+
+// الحصول على قيمة السعر للمنتج المحدد
+const getPriceValue = async (url) => {
+  try {
+    const response = await axios.get(url);
+    const pageContent = response.data;
+
+    const priceMatch = pageContent.match(/<meta property="product:price:amount" content="(\d+\.\d+|\d+)"/);
+
+    if (priceMatch && priceMatch[1]) {
+      return parseFloat(priceMatch[1]);
+    } else {
+      return null;
+    }
+  } catch (error) {
+    console.error(`Error getting price value for ${url}: ${error.message}`);
+    return null;
+  }
+};
+
+// الحصول على الأسعار الأولية لجميع المنتجات
+const initializePrices = async () => {
+  for (const url of urls) {
+    const price = await getPriceValue(url);
+    previousPrices[url] = price !== null ? price : 0;
+    console.log(`Initial price for ${url}: ${previousPrices[url]}`);
+  }
+};
 
 async function checkProductAvailability(url) {
   try {
@@ -176,6 +193,65 @@ async function checkProductAvailability(url) {
   }
 }
 
+const checkForChange = async () => {
+  for (const url of urls) {
+    const newPrice = await getPriceValue(url);
+    if (newPrice === null) continue;
+
+    if ((!previousPrices[url] || previousPrices[url] === 0) && newPrice === 15) {
+      console.log(`السعر تغير من 0 إلى 15 للمنتج في الرابط: ${url}`);
+      const message = 'المنتجات على وشك التوفر، أستعد لتسجيل الدخول';
+      await sendNotification(message);
+
+      const options = {
+        reply_markup: {
+          inline_keyboard: [
+            [
+              { text: 'تسجيل دخول 🔒', url: 'https://www.dzrt.com/ar/customer/account/login' }
+            ]
+          ]
+        }
+      };
+
+      try {
+        await bot.sendMessage(mainChannelId, message, options);
+      } catch (error) {
+        console.error(`Failed to send notification to main channel ${mainChannelId}: ${error.message}`);
+      }
+
+      for (const url of urls) {
+        try {
+          await bot.sendMessage(channels[url].chatId, message, options);
+        } catch (error) {
+          console.error(`Failed to send notification to ${channels[url].chatId}: ${error.message}`);
+        }
+      }
+
+      break; // أرسل الإشعار مرة واحدة فقط
+    }
+
+    previousPrices[url] = newPrice;
+  }
+};
+
+const sendNotification = async (message) => {
+  const options = {
+    reply_markup: {
+      inline_keyboard: [
+        [
+          { text: 'تسجيل دخول 🔒', url: 'https://www.dzrt.com/ar/customer/account/login' }
+        ]
+      ]
+    }
+  };
+
+  try {
+    await bot.sendMessage(mainChannelId, message, options);
+  } catch (error) {
+    console.error(`Failed to send notification: ${error.message}`);
+  }
+};
+
 async function checkAllUrls() {
   for (const url of urls) {
     if (!productStatus[url].isNotifying) {
@@ -184,13 +260,29 @@ async function checkAllUrls() {
   }
 }
 
+// جدولة التحقق من توفر المنتج كل ثانية بين الساعة 13:00 والساعة 23:00
 cron.schedule('* * * * * *', () => {
   const now = new Date();
   const hour = now.getHours();
-
   if (hour >= 13 && hour <= 23) {
     checkAllUrls();
   }
+});
+
+// جدولة التحقق من تغير السعر كل دقيقة بين الساعة 13:00 والساعة 23:00
+cron.schedule('* * * * *', () => {
+  const now = new Date();
+  const hour = now.getHours();
+  if (hour >= 13 && hour <= 23) {
+    checkForChange();
+  }
+});
+
+// تهيئة الأسعار الأولية عند بدء التشغيل
+initializePrices().then(() => {
+  console.log('تم تهيئة الأسعار الأولية بنجاح.');
+}).catch((error) => {
+  console.error(`Failed to initialize prices: ${error.message}`);
 });
 
 const dbConfig = {
