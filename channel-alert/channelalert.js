@@ -75,7 +75,6 @@ bot.on('polling_error', (error) => {
     }, 5000);
   }
 });
-
 const productCooldown = 20 * 60 * 1000; // فترة التهدئة الفردية (20 دقيقة)
 const productOutOfStockCheckDuration = 10 * 1000; // مدة التحقق من نفاد المنتج (10 ثواني)
 let firstNotificationSaved = false; // متغير للتحقق مما إذا تم حفظ أول إشعار أم لا
@@ -221,8 +220,18 @@ async function checkAllUrls() {
   }
 }
 
+// جدولة تهيئة الأسعار الأولية بين الساعة 13:00 والساعة 23:00 يوميا
+cron.schedule('0 13 * * *', async () => {
+  const now = new Date();
+  const hour = now.getHours();
+  if (hour >= 13 && hour <= 23) {
+    await initializePrices();
+    console.log('تم تهيئة الأسعار الأولية بنجاح.');
+  }
+});
+
 // جدولة التحقق من توفر المنتج كل ثانية بين الساعة 13:00 والساعة 23:00
-cron.schedule('* * * * * *', () => {
+cron.schedule('* * * * *', () => {
   const now = new Date();
   const hour = now.getHours();
   if (hour >= 13 && hour <= 23) {
@@ -239,13 +248,6 @@ cron.schedule('* * * * *', () => {
   }
 });
 
-// تهيئة الأسعار الأولية عند بدء التشغيل
-initializePrices().then(() => {
-  console.log('تم تهيئة الأسعار الأولية بنجاح.');
-}).catch((error) => {
-  console.error(`Failed to initialize prices: ${error.message}`);
-});
-
 const checkForChange = async () => {
   if (priceAlertSent) return; // إذا تم إرسال الإشعار بالفعل، لا تقم بفحص التغيرات مرة أخرى
 
@@ -255,7 +257,7 @@ const checkForChange = async () => {
 
     if ((!previousPrices[url] || previousPrices[url] === 0) && newPrice === 15) {
       console.log(`السعر تغير من 0 إلى 15 للمنتج في الرابط: ${url}`);
-      const message = 'المنتجات على وشك التوفر، أستعد لتسجيل الدخول';
+      const message = 'المنتجات على وشك التوفر\n 🔑 أستعد لتسجيل الدخول';
       await sendNotification(message);
 
       const options = {
@@ -307,7 +309,6 @@ const sendNotification = async (message) => {
     console.error(`Failed to send notification: ${error.message}`);
   }
 };
-
 
 
 const dbConfig = {
