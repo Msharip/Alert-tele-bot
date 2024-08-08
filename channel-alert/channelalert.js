@@ -75,8 +75,8 @@ bot.on('polling_error', (error) => {
     }, 5000);
   }
 });
+
 const productCooldown = 20 * 60 * 1000; // فترة التهدئة الفردية (20 دقيقة)
-const productOutOfStockCheckDuration = 10 * 1000; // مدة التحقق من نفاد المنتج (10 ثواني)
 let firstNotificationSaved = false; // متغير للتحقق مما إذا تم حفظ أول إشعار أم لا
 let priceAlertSent = false; // متغير للتحقق مما إذا تم إرسال إشعار تغير السعر أم لا
 
@@ -121,7 +121,6 @@ const initializePrices = async () => {
     console.log(`Initial price for ${url}: ${previousPrices[url]}`);
   }
 };
-
 async function checkProductAvailability(url) {
   try {
     const { data } = await axios.get(url);
@@ -188,11 +187,13 @@ async function checkProductAvailability(url) {
           }
         }
       } else if (isUnavailable) {
-        if (productStatus[url].isAvailable) {
-          // إذا أصبح المنتج غير متوفر للتو، قم بتسجيل وقت بداية عدم التوفر
+        console.log(`*${productNameAr}* - المنتج غير متاح`);
+        if (!productStatus[url].isOutOfStockNotified && productStatus[url].outOfStockStartTime === null) {
+          // إذا لم يتم تسجيل وقت بداية عدم التوفر، قم بتسجيله
           productStatus[url].outOfStockStartTime = currentTime;
-        } else if (productStatus[url].outOfStockStartTime && (currentTime - productStatus[url].outOfStockStartTime > productOutOfStockCheckDuration)) {
-          // إذا استمر عدم توفر المنتج لمدة تزيد عن 10 ثوانٍ، قم بإرسال إشعار النفاد
+          console.log(`*${productNameAr}* - تسجيل وقت بداية عدم التوفر: ${currentTime}`);
+        } else if (!productStatus[url].isOutOfStockNotified && (currentTime - productStatus[url].outOfStockStartTime > 5000)) {
+          // إذا استمر عدم توفر المنتج لمدة تزيد عن 5 ثواني، قم بإرسال إشعار النفاد
           const availableDuration = Math.round((currentTime - productStatus[url].availableStartTime) / (1000 * 60)); // حساب المدة بالدقائق
           const message = `*${productNameAr}* - نفذ من المخزون ⛔️\nبقي المنتج متوفر لمدة ${availableDuration} دقيقة.`;
           console.log(`*${productNameAr}* - نفذ من المخزون ⛔️\nبقي المنتج متوفر لمدة ${availableDuration} دقيقة.`);
@@ -211,6 +212,8 @@ async function checkProductAvailability(url) {
   } catch (error) {
   }
 }
+
+
 
 async function checkAllUrls() {
   for (const url of urls) {
