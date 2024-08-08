@@ -112,7 +112,6 @@ const getPriceValue = async (url) => {
     return null;
   }
 };
-
 // الحصول على الأسعار الأولية لجميع المنتجات
 const initializePrices = async () => {
   for (const url of urls) {
@@ -165,10 +164,8 @@ async function checkProductAvailability(url) {
           isAvailable: true,
           lastNotificationTime: currentTime,
           isNotifying: true,
-          isOutOfStockNotified: false, // إعادة تعيين حالة الإشعار عند التوفر
-          individualCooldownTime: currentTime,
-          availableStartTime: currentTime, // تسجيل وقت بداية التوفر
-          outOfStockStartTime: null // إعادة تعيين وقت بداية عدم التوفر
+          isOutOfStockNotified: false,
+          individualCooldownTime: currentTime
         };
 
         setTimeout(() => {
@@ -186,34 +183,14 @@ async function checkProductAvailability(url) {
             connection.release();
           }
         }
-      } else if (isUnavailable) {
-        console.log(`*${productNameAr}* - المنتج غير متاح`);
-        if (!productStatus[url].isOutOfStockNotified && productStatus[url].outOfStockStartTime === null) {
-          // إذا لم يتم تسجيل وقت بداية عدم التوفر، قم بتسجيله
-          productStatus[url].outOfStockStartTime = currentTime;
-          console.log(`*${productNameAr}* - تسجيل وقت بداية عدم التوفر: ${currentTime}`);
-        } else if (!productStatus[url].isOutOfStockNotified && (currentTime - productStatus[url].outOfStockStartTime > 5000)) {
-          // إذا استمر عدم توفر المنتج لمدة تزيد عن 5 ثواني، قم بإرسال إشعار النفاد
-          const availableDuration = Math.round((currentTime - productStatus[url].availableStartTime) / (1000 * 60)); // حساب المدة بالدقائق
-          const message = `*${productNameAr}* - نفذ من المخزون ⛔️\nبقي المنتج متوفر لمدة ${availableDuration} دقيقة.`;
-          console.log(`*${productNameAr}* - نفذ من المخزون ⛔️\nبقي المنتج متوفر لمدة ${availableDuration} دقيقة.`);
-
-          await bot.sendMessage(channels[url].chatId, message, { parse_mode: 'Markdown' });
-
-          productStatus[url].isAvailable = false;
-          productStatus[url].isOutOfStockNotified = true; // تعيين الحالة لتجنب تكرار الإشعار
-          productStatus[url].outOfStockStartTime = null; // إعادة تعيين وقت بداية عدم التوفر
-        }
-      } else {
-        // إعادة تعيين وقت بداية عدم التوفر إذا عاد المنتج إلى حالة التوفر
-        productStatus[url].outOfStockStartTime = null;
+      } else if (isUnavailable && productStatus[url].isAvailable) {
+        // إذا كان المنتج غير متوفر وكان متاحاً سابقاً
+        productStatus[url].isAvailable = false;
       }
     }
   } catch (error) {
   }
 }
-
-
 
 async function checkAllUrls() {
   for (const url of urls) {
@@ -222,9 +199,8 @@ async function checkAllUrls() {
     }
   }
 }
-
 // جدولة تهيئة الأسعار الأولية بين الساعة 13:00 والساعة 23:00 يوميا
-cron.schedule('10 13 * * *', async () => {
+cron.schedule('0 13 * * *', async () => {
   const now = new Date();
   const hour = now.getHours();
   if (hour >= 13 && hour <= 23) {
@@ -260,7 +236,7 @@ const checkForChange = async () => {
 
     if ((!previousPrices[url] || previousPrices[url] === 0) && newPrice === 15) {
       console.log(`السعر تغير من 0 إلى 15 للمنتج في الرابط: ${url}`);
-      const message = 'المنتجات على وشك التوفر\n 🔑 أستعد لتسجيل الدخول';
+      const message = 'المنتجات على وشك التوفر , أستعد لتسجيل الدخول';
       await sendNotification(message);
 
       const options = {
@@ -312,6 +288,13 @@ const sendNotification = async (message) => {
     console.error(`Failed to send notification: ${error.message}`);
   }
 };
+
+// استدعاء دالة التهيئة عند بدء التشغيل
+(async () => {
+  await initializePrices();
+  console.log('تم تهيئة الأسعار الأولية بنجاح عند بدء التشغيل.');
+  checkAllUrls();
+})();
 
 
 const dbConfig = {
