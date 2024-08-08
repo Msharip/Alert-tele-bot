@@ -221,7 +221,7 @@ async function checkAllUrls() {
 }
 
 // جدولة تهيئة الأسعار الأولية بين الساعة 13:00 والساعة 23:00 يوميا
-cron.schedule('0 13 * * *', async () => {
+cron.schedule('10 13 * * *', async () => {
   const now = new Date();
   const hour = now.getHours();
   if (hour >= 13 && hour <= 23) {
@@ -231,7 +231,7 @@ cron.schedule('0 13 * * *', async () => {
 });
 
 // جدولة التحقق من توفر المنتج كل ثانية بين الساعة 13:00 والساعة 23:00
-cron.schedule('* * * * *', () => {
+cron.schedule('* * * * * *', () => {
   const now = new Date();
   const hour = now.getHours();
   if (hour >= 13 && hour <= 23) {
