@@ -203,7 +203,7 @@ async function checkAllUrls() {
 }
 
 // جدولة تهيئة الأسعار الأولية بين الساعة 13:00 والساعة 23:00 يوميا
-cron.schedule('0 13 * * *', async () => {
+cron.schedule('10 13 * * *', async () => {
   const now = new Date();
   const hour = now.getHours();
   if (hour >= 13 && hour <= 18) {
@@ -222,7 +222,7 @@ cron.schedule('* * * * * *', () => {
 });
 
 // جدولة التحقق من تغير السعر كل دقيقة بين الساعة 13:00 والساعة 23:00
-cron.schedule('01 13 * * *', async () => {
+cron.schedule('* * * * *', async () => {
   const now = new Date();
   const hour = now.getHours();
   if (hour >= 13 && hour <= 18) {
