@@ -87,6 +87,7 @@ urls.forEach(url => {
     isAvailable: false,
     lastNotificationTime: 0,
     isNotifying: false,
+    isOutOfStockNotified: false,
     individualCooldownTime: 0,
     outOfStockStartTime: null
   };
@@ -111,7 +112,6 @@ const getPriceValue = async (url) => {
     return null;
   }
 };
-
 // الحصول على الأسعار الأولية لجميع المنتجات
 const initializePrices = async () => {
   for (const url of urls) {
@@ -120,7 +120,6 @@ const initializePrices = async () => {
     console.log(`Initial price for ${url}: ${previousPrices[url]}`);
   }
 };
-
 async function checkProductAvailability(url) {
   try {
     const { data } = await axios.get(url);
@@ -165,9 +164,8 @@ async function checkProductAvailability(url) {
           isAvailable: true,
           lastNotificationTime: currentTime,
           isNotifying: true,
-          individualCooldownTime: currentTime,
-          availableStartTime: currentTime, // تسجيل وقت بداية التوفر
-          outOfStockStartTime: null // إعادة تعيين وقت بداية عدم التوفر
+          isOutOfStockNotified: false,
+          individualCooldownTime: currentTime
         };
 
         setTimeout(() => {
@@ -185,8 +183,8 @@ async function checkProductAvailability(url) {
             connection.release();
           }
         }
-      } else if (isUnavailable) {
-        // إذا كان المنتج غير متوفر، لا نفعل شيئاً
+      } else if (isUnavailable && productStatus[url].isAvailable) {
+        // إذا كان المنتج غير متوفر وكان متاحاً سابقاً
         productStatus[url].isAvailable = false;
       }
     }
@@ -201,12 +199,11 @@ async function checkAllUrls() {
     }
   }
 }
-
 // جدولة تهيئة الأسعار الأولية بين الساعة 13:00 والساعة 23:00 يوميا
-cron.schedule('10 13 * * *', async () => {
+cron.schedule('0 13 * * *', async () => {
   const now = new Date();
   const hour = now.getHours();
-  if (hour >= 13 && hour <= 18) {
+  if (hour >= 13 && hour <= 17) {
     await initializePrices();
     console.log('تم تهيئة الأسعار الأولية بنجاح.');
   }
@@ -222,10 +219,10 @@ cron.schedule('* * * * * *', () => {
 });
 
 // جدولة التحقق من تغير السعر كل دقيقة بين الساعة 13:00 والساعة 23:00
-cron.schedule('* * * * *', async () => {
+cron.schedule('* * * * *', () => {
   const now = new Date();
   const hour = now.getHours();
-  if (hour >= 13 && hour <= 18) {
+  if (hour >= 13 && hour <= 17) {
     checkForChange();
   }
 });
@@ -240,7 +237,7 @@ const checkForChange = async () => {
     if ((!previousPrices[url] || previousPrices[url] === 0) && newPrice === 15) {
       console.log(`السعر تغير من 0 إلى 15 للمنتج في الرابط: ${url}`);
       const message = 'المنتجات على وشك التوفر , أستعد لتسجيل الدخول';
-            await sendNotification(message);
+      await sendNotification(message);
 
       const options = {
         reply_markup: {
@@ -292,6 +289,12 @@ const sendNotification = async (message) => {
   }
 };
 
+// استدعاء دالة التهيئة عند بدء التشغيل
+(async () => {
+  await initializePrices();
+  console.log('تم تهيئة الأسعار الأولية بنجاح عند بدء التشغيل.');
+  checkAllUrls();
+})();
 
 
 const dbConfig = {
