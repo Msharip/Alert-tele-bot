@@ -78,7 +78,6 @@ bot.on('polling_error', (error) => {
 
 const productCooldown = 20 * 60 * 1000; // فترة التهدئة الفردية (20 دقيقة)
 let firstNotificationSaved = false; // متغير للتحقق مما إذا تم حفظ أول إشعار أم لا
-let priceAlertSent = false; // متغير للتحقق مما إذا تم إرسال إشعار تغير السعر أم لا
 
 const productStatus = {};
 
@@ -135,7 +134,7 @@ async function checkProductAvailability(url) {
         const localTime = moment(currentTime).tz('Asia/Riyadh').format('YYYY-MM-DD HH:mm:ss');
         const message = `*${productNameAr}* - متوفر الآن ✅`;
         console.log(`*${productNameAr}* - متوفر الآن ✅`);
-
+      
         const replyMarkup = {
           inline_keyboard: [
             [
@@ -147,19 +146,19 @@ async function checkProductAvailability(url) {
             ]
           ]
         };
-
+      
         await bot.sendPhoto(mainChannelId, imageUrlAvailable, {
           caption: message,
           parse_mode: 'Markdown',
           reply_markup: JSON.stringify(replyMarkup)
         });
-
+      
         await bot.sendPhoto(channels[url].chatId, imageUrlAvailable, {
           caption: message,
           parse_mode: 'Markdown',
           reply_markup: JSON.stringify(replyMarkup)
         });
-
+      
         productStatus[url] = {
           isAvailable: true,
           lastNotificationTime: currentTime,
@@ -167,31 +166,31 @@ async function checkProductAvailability(url) {
           isOutOfStockNotified: false,
           individualCooldownTime: currentTime
         };
-
+      
         setTimeout(() => {
           productStatus[url].isNotifying = false;
         }, productCooldown);
-
+      
         if (!firstNotificationSaved) {
-          // إضافة وقت أول إشعار إلى قاعدة البيانات لأول منتج فقط
           const connection = await pool.getConnection();
           try {
             const query = 'INSERT INTO product_notifications (product_url, notification_time) VALUES (?, ?)';
             await connection.query(query, [url, localTime]);
-            firstNotificationSaved = true; // تعيين المتغير بعد حفظ أول إشعار
+            firstNotificationSaved = true;
           } finally {
             connection.release();
           }
         }
       } else if (isUnavailable && productStatus[url].isAvailable) {
-        // إذا كان المنتج غير متوفر وكان متاحاً سابقاً
         productStatus[url].isAvailable = false;
-      }
+        productStatus[url].individualCooldownTime = 0; // إعادة تعيين فترة التهدئة عند نفاد المنتج
+      } else if (productStatus[url].isAvailable && (currentTime - productStatus[url].individualCooldownTime > productCooldown)) {
+        productStatus[url].individualCooldownTime = currentTime; // تحديث وقت التهدئة إذا كان المنتج متوفرًا بالفعل بعد فترة التهدئة
+      }      
     }
   } catch (error) {
   }
 }
-
 async function checkAllUrls() {
   for (const url of urls) {
     if (!productStatus[url].isNotifying) {
@@ -199,45 +198,44 @@ async function checkAllUrls() {
     }
   }
 }
-// جدولة تهيئة الأسعار الأولية بين الساعة 13:00 والساعة 23:00 يوميا
+// جدولة تهيئة الأسعار الأولية بين الساعة 13:00 والساعة 22:00 يوميا
 cron.schedule('0 13 * * *', async () => {
   const now = new Date();
   const hour = now.getHours();
-  if (hour >= 13 && hour <= 17) {
+  if (hour >= 13 && (hour < 22 || (hour === 22 && minutes <= 45))) {
     await initializePrices();
     console.log('تم تهيئة الأسعار الأولية بنجاح.');
   }
 });
 
-// جدولة التحقق من توفر المنتج كل ثانية بين الساعة 13:00 والساعة 23:00
+// جدولة التحقق من توفر المنتج كل ثانية بين الساعة 01:00 والساعة 10:40
 cron.schedule('* * * * * *', () => {
   const now = new Date();
   const hour = now.getHours();
-  if (hour >= 13 && hour <= 23) {
+  const minutes = now.getMinutes();
+  if (hour >= 13 && (hour < 22 || (hour === 22 && minutes <= 45))) {
     checkAllUrls();
   }
 });
 
-// جدولة التحقق من تغير السعر كل دقيقة بين الساعة 13:00 والساعة 23:00
+// جدولة التحقق من تغير السعر كل دقيقة بين الساعة 13:00 والساعة 22:00
 cron.schedule('* * * * *', () => {
   const now = new Date();
   const hour = now.getHours();
-  if (hour >= 13 && hour <= 17) {
+  if (hour >= 13 && (hour < 22 || (hour === 22 && minutes <= 45))) {
     checkForChange();
   }
 });
 
 const checkForChange = async () => {
-  if (priceAlertSent) return; // إذا تم إرسال الإشعار بالفعل، لا تقم بفحص التغيرات مرة أخرى
-
   for (const url of urls) {
     const newPrice = await getPriceValue(url);
     if (newPrice === null) continue;
 
+    // تحقق إذا كان السعر تغير من 0 إلى 15 وأرسل الإشعار
     if ((!previousPrices[url] || previousPrices[url] === 0) && newPrice === 15) {
       console.log(`السعر تغير من 0 إلى 15 للمنتج في الرابط: ${url}`);
-      const message = 'المنتجات على وشك التوفر , أستعد لتسجيل الدخول';
-      await sendNotification(message);
+      const message = 'المنتج على وشك التوفر , أستعد لتسجيل الدخول';
 
       const options = {
         reply_markup: {
@@ -246,56 +244,30 @@ const checkForChange = async () => {
               { text: 'تسجيل دخول 🔒', url: 'https://www.dzrt.com/ar/customer/account/login' }
             ]
           ]
-        }
+        },
+        parse_mode: 'Markdown' // لضمان تنسيق النص في الرسالة
       };
 
       try {
-        await bot.sendMessage(mainChannelId, message, options);
+        await bot.sendMessage(channels[url].chatId, message, options);
+        console.log(`تم إرسال الإشعار بنجاح إلى القناة: ${channels[url].chatId}`);
       } catch (error) {
-        console.error(`Failed to send notification to main channel ${mainChannelId}: ${error.message}`);
+        console.error(`Failed to send notification to ${channels[url].chatId}: ${error.message}`);
       }
-
-      for (const url of urls) {
-        try {
-          await bot.sendMessage(channels[url].chatId, message, options);
-        } catch (error) {
-          console.error(`Failed to send notification to ${channels[url].chatId}: ${error.message}`);
-        }
-      }
-
-      priceAlertSent = true; // تعيين المتغير بعد إرسال أول إشعار
-      break; // أرسل الإشعار مرة واحدة فقط
     }
 
+    // تحديث السعر السابق بعد الفحص
     previousPrices[url] = newPrice;
   }
 };
 
-const sendNotification = async (message) => {
-  const options = {
-    reply_markup: {
-      inline_keyboard: [
-        [
-          { text: 'تسجيل دخول 🔒', url: 'https://www.dzrt.com/ar/customer/account/login' }
-        ]
-      ]
-    }
-  };
-
-  try {
-    await bot.sendMessage(mainChannelId, message, options);
-  } catch (error) {
-    console.error(`Failed to send notification: ${error.message}`);
-  }
-};
-
+/*
 // استدعاء دالة التهيئة عند بدء التشغيل
 (async () => {
   await initializePrices();
   console.log('تم تهيئة الأسعار الأولية بنجاح عند بدء التشغيل.');
   checkAllUrls();
-})();
-
+})();*/
 
 const dbConfig = {
   host: process.env.DB_HOST,
