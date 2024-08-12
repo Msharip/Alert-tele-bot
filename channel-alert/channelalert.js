@@ -224,10 +224,10 @@ async function checkProductAvailability(url) {
             connection.release();
           }
         }
-      } else if (isUnavailable && productStatus[url].isAvailable) {
-        // إذا كان المنتج غير متوفر وكان متاحاً سابقاً
+      } else if (isUnavailable) {
+        // إذا كان المنتج غير متوفر، لا نفعل شيئاً
         productStatus[url].isAvailable = false;
-      }  
+      } 
     }
   } catch (error) {
   }
