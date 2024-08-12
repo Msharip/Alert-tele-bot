@@ -59,18 +59,18 @@ bot.on('polling_error', (error) => {
 
   if (error.response && error.response.statusCode === 502) {
     setTimeout(() => {
-      console.log('Retrying polling after 10 seconds due to 502 error...bot-1');
+      console.log('Retrying polling after 10 seconds due to 502 error...bot-');
       bot.startPolling();
     }, 10000);
   } else if (error.response && error.response.statusCode === 429) {
     const retryAfter = parseInt(error.response.headers['retry-after']) || 30;
-    console.log(`Retrying polling after ${retryAfter} seconds due to 429 error...bot-1`);
+    console.log(`Retrying polling after ${retryAfter} seconds due to 429 error...bot-`);
     setTimeout(() => {
       bot.startPolling();
     }, retryAfter * 1000);
   } else {
     setTimeout(() => {
-      console.log('Retrying polling after 5 seconds due to other error... bot-1');
+      console.log('Retrying polling after 5 seconds due to other error... bot-');
       bot.startPolling();
     }, 5000);
   }
@@ -119,6 +119,49 @@ const initializePrices = async () => {
     console.log(`Initial price for ${url}: ${previousPrices[url]}`);
   }
 };
+
+const checkForChange = async () => {
+  for (const url of urls) {
+    const newPrice = await getPriceValue(url);
+    if (newPrice === null) continue;
+
+    // تحقق إذا كان السعر تغير من 0 إلى 15 وأرسل الإشعار
+    if ((!previousPrices[url] || previousPrices[url] === 0) && newPrice === 15) {
+      console.log(`السعر تغير من 0 إلى 15 للمنتج في الرابط: ${url}`);
+      const message = 'المنتج على وشك التوفر , أستعد لتسجيل الدخول';
+
+      const options = {
+        reply_markup: {
+          inline_keyboard: [
+            [
+              { text: 'تسجيل دخول 🔒', url: 'https://www.dzrt.com/ar/customer/account/login' }
+            ]
+          ]
+        },
+        parse_mode: 'Markdown' // لضمان تنسيق النص في الرسالة
+      };
+
+      try {
+        await bot.sendMessage(channels[url].chatId, message, options);
+        console.log(`تم إرسال الإشعار بنجاح إلى القناة: ${channels[url].chatId}`);
+      } catch (error) {
+        console.error(`Failed to send notification to ${channels[url].chatId}: ${error.message}`);
+      }
+    }
+
+    // تحديث السعر السابق بعد الفحص
+    previousPrices[url] = newPrice;
+  }
+};
+
+/*
+// استدعاء دالة التهيئة عند بدء التشغيل
+(async () => {
+  await initializePrices();
+  console.log('تم تهيئة الأسعار الأولية بنجاح عند بدء التشغيل.');
+  checkAllUrls();
+})();*/
+
 async function checkProductAvailability(url) {
   try {
     const { data } = await axios.get(url);
@@ -182,15 +225,14 @@ async function checkProductAvailability(url) {
           }
         }
       } else if (isUnavailable && productStatus[url].isAvailable) {
+        // إذا كان المنتج غير متوفر وكان متاحاً سابقاً
         productStatus[url].isAvailable = false;
-        productStatus[url].individualCooldownTime = 0; // إعادة تعيين فترة التهدئة عند نفاد المنتج
-      } else if (productStatus[url].isAvailable && (currentTime - productStatus[url].individualCooldownTime > productCooldown)) {
-        productStatus[url].individualCooldownTime = currentTime; // تحديث وقت التهدئة إذا كان المنتج متوفرًا بالفعل بعد فترة التهدئة
-      }      
+      }  
     }
   } catch (error) {
   }
 }
+
 async function checkAllUrls() {
   for (const url of urls) {
     if (!productStatus[url].isNotifying) {
@@ -198,8 +240,8 @@ async function checkAllUrls() {
     }
   }
 }
-// جدولة تهيئة الأسعار الأولية بين الساعة 13:00 والساعة 22:00 يوميا
-cron.schedule('0 13 * * *', async () => {
+// جدولة تهيئة الأسعار الأولية بين الساعة 13:10 والساعة 22:00 يوميا
+cron.schedule('09 13 * * *', async () => {
   const now = new Date();
   const hour = now.getHours();
   if (hour >= 13 && (hour < 22 || (hour === 22 && minutes <= 45))) {
@@ -208,66 +250,25 @@ cron.schedule('0 13 * * *', async () => {
   }
 });
 
-// جدولة التحقق من توفر المنتج كل ثانية بين الساعة 01:00 والساعة 10:40
+// جدولة التحقق من توفر المنتج كل ثانية بين الساعة 13:10 والساعة 22:45
 cron.schedule('* * * * * *', () => {
   const now = new Date();
   const hour = now.getHours();
   const minutes = now.getMinutes();
-  if (hour >= 13 && (hour < 22 || (hour === 22 && minutes <= 45))) {
+  if ((hour === 13 && minutes >= 10) || (hour > 13 && hour < 22) || (hour === 22 && minutes <= 45)) {
     checkAllUrls();
   }
 });
 
-// جدولة التحقق من تغير السعر كل دقيقة بين الساعة 13:00 والساعة 22:00
+// جدولة التحقق من تغير السعر كل دقيقة بين الساعة 13:10 والساعة 22:45
 cron.schedule('* * * * *', () => {
   const now = new Date();
   const hour = now.getHours();
-  if (hour >= 13 && (hour < 22 || (hour === 22 && minutes <= 45))) {
+  const minutes = now.getMinutes();
+  if ((hour === 13 && minutes >= 10) || (hour > 13 && hour < 22) || (hour === 22 && minutes <= 45)) {
     checkForChange();
   }
 });
-
-const checkForChange = async () => {
-  for (const url of urls) {
-    const newPrice = await getPriceValue(url);
-    if (newPrice === null) continue;
-
-    // تحقق إذا كان السعر تغير من 0 إلى 15 وأرسل الإشعار
-    if ((!previousPrices[url] || previousPrices[url] === 0) && newPrice === 15) {
-      console.log(`السعر تغير من 0 إلى 15 للمنتج في الرابط: ${url}`);
-      const message = 'المنتج على وشك التوفر , أستعد لتسجيل الدخول';
-
-      const options = {
-        reply_markup: {
-          inline_keyboard: [
-            [
-              { text: 'تسجيل دخول 🔒', url: 'https://www.dzrt.com/ar/customer/account/login' }
-            ]
-          ]
-        },
-        parse_mode: 'Markdown' // لضمان تنسيق النص في الرسالة
-      };
-
-      try {
-        await bot.sendMessage(channels[url].chatId, message, options);
-        console.log(`تم إرسال الإشعار بنجاح إلى القناة: ${channels[url].chatId}`);
-      } catch (error) {
-        console.error(`Failed to send notification to ${channels[url].chatId}: ${error.message}`);
-      }
-    }
-
-    // تحديث السعر السابق بعد الفحص
-    previousPrices[url] = newPrice;
-  }
-};
-
-/*
-// استدعاء دالة التهيئة عند بدء التشغيل
-(async () => {
-  await initializePrices();
-  console.log('تم تهيئة الأسعار الأولية بنجاح عند بدء التشغيل.');
-  checkAllUrls();
-})();*/
 
 const dbConfig = {
   host: process.env.DB_HOST,
