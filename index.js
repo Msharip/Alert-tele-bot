@@ -8,10 +8,7 @@ require('./channel-alert/channelalert.js');
 require('./tele/tele.js');
 
 
-const port = process.env.PORT || 3000;
-app.listen(port, () => {
-  console.log(`Server is running on port ${port}`);
-});
+console.log("Bots are Running")
 
 
 

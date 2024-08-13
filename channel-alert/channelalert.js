@@ -76,7 +76,7 @@ bot.on('polling_error', (error) => {
   }
 });
 
-const productCooldown = 20 * 60 * 1000; // فترة التهدئة الفردية (20 دقيقة)
+const productCooldown = 25 * 60 * 1000; // فترة التهدئة الفردية (25 دقيقة)
 let firstNotificationSaved = false; // متغير للتحقق مما إذا تم حفظ أول إشعار أم لا
 
 const productStatus = {};
@@ -154,13 +154,12 @@ const checkForChange = async () => {
   }
 };
 
-/*
 // استدعاء دالة التهيئة عند بدء التشغيل
 (async () => {
   await initializePrices();
   console.log('تم تهيئة الأسعار الأولية بنجاح عند بدء التشغيل.');
   checkAllUrls();
-})();*/
+})();
 
 async function checkProductAvailability(url) {
   try {
@@ -241,7 +240,7 @@ async function checkAllUrls() {
   }
 }
 // جدولة تهيئة الأسعار الأولية بين الساعة 13:10 والساعة 22:00 يوميا
-cron.schedule('09 13 * * *', async () => {
+cron.schedule('07 13 * * *', async () => {
   const now = new Date();
   const hour = now.getHours();
   if (hour >= 13 && (hour < 22 || (hour === 22 && minutes <= 45))) {
@@ -249,7 +248,15 @@ cron.schedule('09 13 * * *', async () => {
     console.log('تم تهيئة الأسعار الأولية بنجاح.');
   }
 });
-
+// جدولة التحقق من تغير السعر كل 40 ثانيه بين الساعة 13:10 والساعة 22:45
+cron.schedule('*/40 * * * * *', () => {
+  const now = new Date();
+  const hour = now.getHours();
+  const minutes = now.getMinutes();
+  if ((hour === 13 && minutes >= 8) || (hour > 13 && hour < 22) || (hour === 22 && minutes <= 30)) {
+    checkForChange();
+  }
+});
 // جدولة التحقق من توفر المنتج كل ثانية بين الساعة 13:10 والساعة 22:45
 cron.schedule('* * * * * *', () => {
   const now = new Date();
@@ -257,16 +264,6 @@ cron.schedule('* * * * * *', () => {
   const minutes = now.getMinutes();
   if ((hour === 13 && minutes >= 10) || (hour > 13 && hour < 22) || (hour === 22 && minutes <= 45)) {
     checkAllUrls();
-  }
-});
-
-// جدولة التحقق من تغير السعر كل دقيقة بين الساعة 13:10 والساعة 22:45
-cron.schedule('* * * * *', () => {
-  const now = new Date();
-  const hour = now.getHours();
-  const minutes = now.getMinutes();
-  if ((hour === 13 && minutes >= 10) || (hour > 13 && hour < 22) || (hour === 22 && minutes <= 45)) {
-    checkForChange();
   }
 });
 
