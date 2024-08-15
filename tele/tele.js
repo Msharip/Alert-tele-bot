@@ -59,11 +59,23 @@ async function checkProductAvailability(url) {
 
       if (!isUnavailable && (currentTime - productStatus[url].individualCooldownTime > productCooldown)) {
         // المنتج متوفر الآن وفترة التهدئة الفردية قد انقضت
-        const message = `*${productNameAr}* - متوفر الآن ✅ \n[ أضغط هنا - اضافة الى السلة ](${url})`;
+        const message = `*${productNameAr}* - متوفر الآن ✅ \n`;
 
         // إضافة تأخير قبل إرسال الإشعار
         setTimeout(async () => {
-          const sentMessage = await bot.sendPhoto(chatId, imageUrl, { caption: message, parse_mode: 'Markdown' });
+          const sentMessage = await bot.sendPhoto(chatId, imageUrl, {
+            caption: message,
+            parse_mode: 'Markdown',
+            reply_markup: {
+              inline_keyboard: [
+                [
+                  { text: '📦 المنتجات', url: 'https://www.dzrt.com/ar/our-products.html' },
+                  { text: '🛒 الإضافة للسلة', url: url },
+
+                ]
+              ]
+            }
+          });
 
           productStatus[url] = {
             isAvailable: true,
