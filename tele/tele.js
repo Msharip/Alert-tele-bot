@@ -89,7 +89,7 @@ async function checkProductAvailability(url) {
           const mediaId = await twitterClient.v1.uploadMedia(imageUrl); // تحميل الصورة إلى تويتر
           await twitterClient.v2.tweet({ text: tweetMessage, media: { media_ids: [mediaId] } });
 
-        }, 180000); // تأخير لمدة 3 دقائق (180000 مللي ثانية)
+        }, 300000); // تأخير لمدة 5 دقائق (300000 مللي ثانية)
 
       } else if (isUnavailable && productStatus[url].isAvailable) {
         // المنتج غير متوفر الآن ولكنه كان متوفرًا في الفحص السابق

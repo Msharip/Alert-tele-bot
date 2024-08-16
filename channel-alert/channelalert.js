@@ -248,8 +248,8 @@ cron.schedule('07 13 * * *', async () => {
     console.log('تم تهيئة الأسعار الأولية بنجاح.');
   }
 });
-// جدولة التحقق من تغير السعر كل 40 ثانيه بين الساعة 13:10 والساعة 22:45
-cron.schedule('*/40 * * * * *', () => {
+// جدولة التحقق من تغير السعر كل 20 ثانيه بين الساعة 13:10 والساعة 22:45
+cron.schedule('*/20 * * * * *', () => {
   const now = new Date();
   const hour = now.getHours();
   const minutes = now.getMinutes();
