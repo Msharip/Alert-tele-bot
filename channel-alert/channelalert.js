@@ -13,7 +13,7 @@ function delay(ms) {
 
 const productNames = {
   'https://www.dzrt.com/ar/icy-rush.html': { ar: 'آيسي رش', en: 'icy-rush' },
-  'https://www.dzrt.com/ar/tamra.html': { ar: 'تمرة', en: 'tamra' },
+  'https://www.dzrt.com/ar/seaside-frost.html': { ar: 'سي سايد', en: 'seaside-frost' },
   'https://www.dzrt.com/ar/highland-berries.html': { ar: 'هايلاند بيريز', en: 'highland-berries' },
   'https://www.dzrt.com/ar/garden-mint.html': { ar: 'جاردن منت', en: 'garden-mint' },
   'https://www.dzrt.com/ar/mint-fusion.html': { ar: 'منت فيوجن', en: 'mint-fusion' },
@@ -21,12 +21,14 @@ const productNames = {
   'https://www.dzrt.com/ar/samra.html': { ar: 'سمرة', en: 'samra' },
   'https://www.dzrt.com/ar/purple-mist.html': { ar: 'بيربل مست', en: 'purple-mist' },
   'https://www.dzrt.com/ar/edgy-mint.html': { ar: 'ايدجي منت', en: 'edgy-mint' },
-  'https://www.dzrt.com/ar/seaside-frost.html': { ar: 'سي سايد', en: 'seaside-frost' },
+  'https://www.dzrt.com/ar/tamra.html': { ar: 'تمرة', en: 'tamra' },
+
 
 };
 
 const urls = [
   'https://www.dzrt.com/ar/icy-rush.html',
+  'https://www.dzrt.com/ar/seaside-frost.html',
   'https://www.dzrt.com/ar/tamra.html',
   'https://www.dzrt.com/ar/highland-berries.html',
   'https://www.dzrt.com/ar/garden-mint.html',
@@ -35,11 +37,11 @@ const urls = [
   'https://www.dzrt.com/ar/samra.html',
   'https://www.dzrt.com/ar/purple-mist.html',
   'https://www.dzrt.com/ar/edgy-mint.html',
-  'https://www.dzrt.com/ar/seaside-frost.html',
 ];
 
 const channels = {
   'https://www.dzrt.com/ar/icy-rush.html': { ar: 'آيسي رش', en: 'icy-rush', chatId: process.env.CHAT_ID_ICY_RUSH },
+  'https://www.dzrt.com/ar/seaside-frost.html': { ar: 'سي سايد', en: 'seaside-frost', chatId: process.env.CHAT_ID_SEASIDE },
   'https://www.dzrt.com/ar/highland-berries.html': { ar: 'هايلاند بيريز', en: 'highland-berries', chatId: process.env.CHAT_ID_HIGH },
   'https://www.dzrt.com/ar/garden-mint.html': { ar: 'جاردن منت', en: 'garden-mint', chatId: process.env.CHAT_ID_GARDEN },
   'https://www.dzrt.com/ar/mint-fusion.html': { ar: 'منت فيوجن', en: 'mint-fusion', chatId: process.env.CHAT_ID_MINT },
@@ -48,7 +50,6 @@ const channels = {
   'https://www.dzrt.com/ar/purple-mist.html': { ar: 'بيربل مست', en: 'purple-mist', chatId: process.env.CHAT_ID_PURPPLE },
   'https://www.dzrt.com/ar/edgy-mint.html': { ar: 'ايدجي منت', en: 'edgy-mint', chatId: process.env.CHAT_ID_EDGY },
   'https://www.dzrt.com/ar/tamra.html': { ar: 'تمرة', en: 'tamra', chatId: process.env.CHAT_ID_TAMRA },
-  'https://www.dzrt.com/ar/seaside-frost.html': { ar: 'سي سايد', en: 'seaside-frost', chatId: process.env.CHAT_ID_SEASIDE },
 };
 
 const mainChannelId = process.env.CHAT_ID_MAIN;
@@ -173,11 +174,14 @@ async function checkProductAvailability(url) {
       const productNameAr = productNames[url].ar;
       const imageUrlAvailable = path.join(__dirname, '..', 'images', `${productNames[url].en}.png`);
 
-      if (!isUnavailable && !productStatus[url].isAvailable && (currentTime - productStatus[url].individualCooldownTime > productCooldown)) {
+      // تحقق من أن المنتج متاح حاليًا وأن فترة التهدئة قد انقضت وأنه لم يتم إرسال إشعار بعد
+      if (!isUnavailable && !productStatus[url].isAvailable && !productStatus[url].isNotifying && (currentTime - productStatus[url].individualCooldownTime > productCooldown)) {
+        productStatus[url].isNotifying = true;  // تفعيل القفل لمنع إرسال إشعارات متكررة
+
         const localTime = moment(currentTime).tz('Asia/Riyadh').format('YYYY-MM-DD HH:mm:ss');
         const message = `*${productNameAr}* - متوفر الآن ✅`;
         console.log(`*${productNameAr}* - متوفر الآن ✅`);
-      
+
         const replyMarkup = {
           inline_keyboard: [
             [
@@ -189,31 +193,30 @@ async function checkProductAvailability(url) {
             ]
           ]
         };
-      
+
+        // إرسال الإشعار
         await bot.sendPhoto(mainChannelId, imageUrlAvailable, {
           caption: message,
           parse_mode: 'Markdown',
           reply_markup: JSON.stringify(replyMarkup)
         });
-      
+
         await bot.sendPhoto(channels[url].chatId, imageUrlAvailable, {
           caption: message,
           parse_mode: 'Markdown',
           reply_markup: JSON.stringify(replyMarkup)
         });
-      
-        productStatus[url] = {
-          isAvailable: true,
-          lastNotificationTime: currentTime,
-          isNotifying: true,
-          isOutOfStockNotified: false,
-          individualCooldownTime: currentTime
-        };
-      
+
+        // تحديث حالة المنتج
+        productStatus[url].isAvailable = true;
+        productStatus[url].lastNotificationTime = currentTime;
+        productStatus[url].individualCooldownTime = currentTime;
+
+        // إزالة القفل بعد فترة التهدئة
         setTimeout(() => {
           productStatus[url].isNotifying = false;
         }, productCooldown);
-      
+
         if (!firstNotificationSaved) {
           const connection = await pool.getConnection();
           try {
@@ -225,13 +228,16 @@ async function checkProductAvailability(url) {
           }
         }
       } else if (isUnavailable) {
-        // إذا كان المنتج غير متوفر، لا نفعل شيئاً
+        // إذا كان المنتج غير متوفر، تحديث الحالة إلى غير متاح
         productStatus[url].isAvailable = false;
-      } 
+        productStatus[url].isNotifying = false; // تأكد من إلغاء القفل إذا لم يكن المنتج متاحًا
+      }
     }
   } catch (error) {
+    console.error(`Error checking product availability for ${url}: ${error.message}`);
   }
 }
+
 
 async function checkAllUrls() {
   for (const url of urls) {
