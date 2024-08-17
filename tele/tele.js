@@ -114,7 +114,7 @@ cron.schedule('* * * * *', () => {
   const now = new Date();
   const hour = now.getHours();
 
-  if (hour >= 13 && hour <= 22) {
+  if (hour >= 13 && hour <= 16) {
     checkAllUrls();
   }
 });
