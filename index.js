@@ -5,7 +5,7 @@ const app = express();
 require('./channel-alert/channelalert.js');
 
 // AXIOS checking
-//require('./tele/tele.js');
+require('./tele/tele.js');
 
 
 console.log("Bots are Running")
