@@ -14,7 +14,7 @@ const productNames = {
   'https://www.dzrt.com/ar/samra.html': { ar: 'سمرة ', en: 'samra' },
 };
 const urls = [
-
+  
   'https://www.dzrt.com/ar/highland-berries.html',
   'https://www.dzrt.com/ar/garden-mint.html',
   'https://www.dzrt.com/ar/mint-fusion.html',
@@ -28,7 +28,8 @@ const token = '6749756089:AAFMCjy0-85EkyQIrzC4tJU5jIyFJvpnLEI';
 const chatId = '-1002122565496';
 const bot = new TelegramBot(token, { polling: true });
 
-
+const productCooldown = 40 * 60 * 1000; // فترة التهدئة لكل منتج على حدة: 25 دقيقة بالمللي ثانية
+let productStatus = {};
 
 urls.forEach(url => {
   productStatus[url] = { isAvailable: false, lastNotificationTime: 0, messageId: null, individualCooldownTime: 0 };
@@ -39,13 +40,6 @@ const twitterClient = new TwitterApi({
   appSecret: 'NCejLvJb5E8RFfXGGw6lqGH7yqXUhSvjZsZPBthAmFVhhAR095',
   accessToken: '1791965388164440064-6p4RaldWOBEk4XLTlVaXrbT5C0JGVi',
   accessSecret: 'y9R2GZa8ZylPT3pR1BEL3ZYD9A5maVPhv7DIstD9AT2cf',
-});
-
-const productCooldown = 50 * 60 * 1000; // فترة التهدئة لكل منتج على حدة: 25 دقيقة بالمللي ثانية
-let productStatus = {};
-
-urls.forEach(url => {
-  productStatus[url] = { isAvailable: false, lastNotificationTime: 0, messageId: null, individualCooldownTime: 0, hasSentNotification: false };
 });
 
 async function checkProductAvailability(url) {
@@ -59,8 +53,8 @@ async function checkProductAvailability(url) {
       const productNameAr = productNames[url].ar;
       const imageUrl = path.join(__dirname, '..', 'images', `${productNames[url].en}.png`);
 
-      if (!isUnavailable && !productStatus[url].hasSentNotification) {
-        // المنتج متوفر الآن ولم يتم إرسال إشعار من قبل
+      if (!isUnavailable && (currentTime - productStatus[url].individualCooldownTime > productCooldown)) {
+        // المنتج متوفر الآن وفترة التهدئة الفردية قد انقضت
         const message = `*${productNameAr}* - متوفر الآن ✅ \n`;
 
         // إضافة تأخير قبل إرسال الإشعار
@@ -82,8 +76,7 @@ async function checkProductAvailability(url) {
             isAvailable: true,
             lastNotificationTime: currentTime,
             messageId: sentMessage.message_id,
-            individualCooldownTime: currentTime,
-            hasSentNotification: true // تحديث حالة إرسال الإشعار
+            individualCooldownTime: currentTime
           };
 
           // نشر تغريدة على تويتر
@@ -102,7 +95,6 @@ async function checkProductAvailability(url) {
   }
 }
 
-
 async function checkAllUrls() {
   for (const url of urls) {
     const currentTime = Date.now();
@@ -117,7 +109,7 @@ cron.schedule('* * * * *', () => {
   const now = new Date();
   const hour = now.getHours();
 
-  if (hour >= 12 && hour <= 16) {
+  if (hour >= 13 && hour <= 16) {
     checkAllUrls();
   }
 });

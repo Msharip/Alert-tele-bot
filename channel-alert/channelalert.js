@@ -113,6 +113,7 @@ const getPriceValue = async (url) => {
     return null;
   }
 };
+
 // الحصول على الأسعار الأولية لجميع المنتجات
 const initializePrices = async () => {
   for (const url of urls) {
@@ -234,10 +235,8 @@ async function checkProductAvailability(url) {
       }
     }
   } catch (error) {
-    console.error(`Error checking product availability for ${url}: ${error.message}`);
   }
 }
-
 
 async function checkAllUrls() {
   for (const url of urls) {
@@ -246,31 +245,35 @@ async function checkAllUrls() {
     }
   }
 }
-// جدولة تهيئة الأسعار الأولية بين الساعة 13:10 والساعة 22:00 يوميا
-cron.schedule('07 13 * * *', async () => {
+
+// جدولة تهيئة الأسعار الأولية بين الساعة 12:00 الى 10:45 يوميا
+cron.schedule('00 12 * * *', async () => {
   const now = new Date();
   const hour = now.getHours();
-  if (hour >= 13 && (hour < 22 || (hour === 22 && minutes <= 45))) {
+  if (hour >= 12 && (hour < 22 || (hour === 22 && minutes <= 45))) {
     await initializePrices();
     console.log('تم تهيئة الأسعار الأولية بنجاح.');
   }
 });
-// جدولة التحقق من تغير السعر كل 20 ثانيه بين الساعة 13:10 والساعة 22:45
-cron.schedule('*/20 * * * * *', () => {
-  const now = new Date();
-  const hour = now.getHours();
-  const minutes = now.getMinutes();
-  if ((hour === 13 && minutes >= 8) || (hour > 13 && hour < 22) || (hour === 22 && minutes <= 30)) {
-    checkForChange();
-  }
-});
-// جدولة التحقق من توفر المنتج كل ثانية بين الساعة 13:10 والساعة 22:45
+
+// جدولة التحقق من توفر المنتج كل ثانية بين الساعة 12:03 الى 11:53
 cron.schedule('* * * * * *', () => {
   const now = new Date();
   const hour = now.getHours();
   const minutes = now.getMinutes();
-  if ((hour === 13 && minutes >= 10) || (hour > 13 && hour < 22) || (hour === 22 && minutes <= 45)) {
+  if ((hour === 12 && minutes >= 3) || (hour > 12 && hour < 23) || (hour === 23 && minutes <= 53)) {
     checkAllUrls();
+  }
+});
+
+
+// جدولة التحقق من تغير السعر كل 20 ثانية بين الساعة 12:01 الى 11:50
+cron.schedule('*/20 * * * * *', () => {
+  const now = new Date();
+  const hour = now.getHours();
+  const minutes = now.getMinutes();
+  if ((hour === 12 && minutes >= 1) || (hour > 12 && hour < 23) || (hour === 23 && minutes <= 50)) {
+    checkForChange();
   }
 });
 
