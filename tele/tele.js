@@ -28,12 +28,6 @@ const token = '6749756089:AAFMCjy0-85EkyQIrzC4tJU5jIyFJvpnLEI';
 const chatId = '-1002122565496';
 const bot = new TelegramBot(token, { polling: true });
 
-
-
-urls.forEach(url => {
-  productStatus[url] = { isAvailable: false, lastNotificationTime: 0, messageId: null, individualCooldownTime: 0 };
-});
-
 const twitterClient = new TwitterApi({
   appKey: 'HrFfThKnzlbiuVXk2rBMfAndA',
   appSecret: 'NCejLvJb5E8RFfXGGw6lqGH7yqXUhSvjZsZPBthAmFVhhAR095',
