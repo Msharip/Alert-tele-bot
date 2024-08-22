@@ -247,10 +247,10 @@ async function checkAllUrls() {
 }
 
 // جدولة تهيئة الأسعار الأولية بين الساعة 12:00 الى 10:45 يوميا
-cron.schedule('00 12 * * *', async () => {
+cron.schedule('00 11 * * *', async () => {
   const now = new Date();
   const hour = now.getHours();
-  if (hour >= 12 && (hour < 22 || (hour === 22 && minutes <= 45))) {
+  if (hour >= 11 && (hour < 22 || (hour === 22 && minutes <= 45))) {
     await initializePrices();
     console.log('تم تهيئة الأسعار الأولية بنجاح.');
   }
@@ -261,7 +261,7 @@ cron.schedule('* * * * * *', () => {
   const now = new Date();
   const hour = now.getHours();
   const minutes = now.getMinutes();
-  if ((hour === 12 && minutes >= 3) || (hour > 12 && hour < 23) || (hour === 23 && minutes <= 53)) {
+  if ((hour === 11 && minutes >= 3) || (hour > 11 && hour < 23) || (hour === 23 && minutes <= 53)) {
     checkAllUrls();
   }
 });
@@ -272,7 +272,7 @@ cron.schedule('*/20 * * * * *', () => {
   const now = new Date();
   const hour = now.getHours();
   const minutes = now.getMinutes();
-  if ((hour === 12 && minutes >= 1) || (hour > 12 && hour < 23) || (hour === 23 && minutes <= 50)) {
+  if ((hour === 11 && minutes >= 1) || (hour > 11 && hour < 23) || (hour === 23 && minutes <= 50)) {
     checkForChange();
   }
 });
