@@ -113,42 +113,51 @@ const getPriceValue = async (url) => {
     return null;
   }
 };
-
 // الحصول على الأسعار الأولية لجميع المنتجات
 const initializePrices = async () => {
   for (const url of urls) {
     const price = await getPriceValue(url);
     previousPrices[url] = price !== null ? price : 0;
-    console.log(`Initial price for ${url}: ${previousPrices[url]}`);
+    console.log(`price for ${url}: ${previousPrices[url]}`);
   }
 };
 
+const loginNotificationCooldown = 45 * 60 * 1000; // 45 دقائق
+let lastLoginNotificationTime = 0;
+
 const checkForChange = async () => {
-  for (const url of urls) {
+  for (const url of ['https://www.dzrt.com/ar/icy-rush.html', 'https://www.dzrt.com/ar/seaside-frost.html']) {
     const newPrice = await getPriceValue(url);
     if (newPrice === null) continue;
 
-    // تحقق إذا كان السعر تغير من 0 إلى 15 وأرسل الإشعار
+    const currentTime = Date.now();
+
+    // تحقق إذا كان السعر تغير من 0 إلى 15 وأرسل الإشعار إذا لم يكن هناك إشعار خلال فترة التهدئة
     if ((!previousPrices[url] || previousPrices[url] === 0) && newPrice === 15) {
-      console.log(`السعر تغير من 0 إلى 15 للمنتج في الرابط: ${url}`);
-      const message = 'المنتج على وشك التوفر , أستعد لتسجيل الدخول';
+      if (currentTime - lastLoginNotificationTime > loginNotificationCooldown) {
+        console.log(`السعر تغير من 0 إلى 15 للمنتج في الرابط: ${url}`);
+        const message = 'المنتج على وشك التوفر , أستعد لتسجيل الدخول';
 
-      const options = {
-        reply_markup: {
-          inline_keyboard: [
-            [
-              { text: 'تسجيل دخول 🔒', url: 'https://www.dzrt.com/ar/customer/account/login' }
+        const options = {
+          reply_markup: {
+            inline_keyboard: [
+              [
+                { text: 'تسجيل دخول 🔒', url: 'https://www.dzrt.com/ar/customer/account/login' }
+              ]
             ]
-          ]
-        },
-        parse_mode: 'Markdown' // لضمان تنسيق النص في الرسالة
-      };
+          },
+          parse_mode: 'Markdown' // لضمان تنسيق النص في الرسالة
+        };
 
-      try {
-        await bot.sendMessage(channels[url].chatId, message, options);
-        console.log(`تم إرسال الإشعار بنجاح إلى القناة: ${channels[url].chatId}`);
-      } catch (error) {
-        console.error(`Failed to send notification to ${channels[url].chatId}: ${error.message}`);
+        try {
+          await bot.sendMessage(channels[url].chatId, message, options);
+          console.log(`تم إرسال الإشعار بنجاح إلى القناة: ${channels[url].chatId}`);
+          lastLoginNotificationTime = currentTime; // تحديث وقت آخر إشعار تسجيل دخول
+        } catch (error) {
+          console.error(`Failed to send notification to ${channels[url].chatId}: ${error.message}`);
+        }
+      } else {
+        console.log('تم تجاوز إشعار تسجيل الدخول بسبب فترة التهدئة.');
       }
     }
 
@@ -246,33 +255,33 @@ async function checkAllUrls() {
   }
 }
 
-// جدولة تهيئة الأسعار الأولية بين الساعة 12:00 الى 10:45 يوميا
-cron.schedule('00 11 * * *', async () => {
+// جدولة تهيئة الأسعار الأولية بين الساعة 10:00 الى 10:45 يوميا
+cron.schedule('00 10 * * *', async () => {
   const now = new Date();
   const hour = now.getHours();
-  if (hour >= 11 && (hour < 22 || (hour === 22 && minutes <= 45))) {
+  if (hour >= 10 && (hour < 22 || (hour === 22 && minutes <= 45))) {
     await initializePrices();
     console.log('تم تهيئة الأسعار الأولية بنجاح.');
   }
 });
 
-// جدولة التحقق من توفر المنتج كل ثانية بين الساعة 12:03 الى 11:53
+// جدولة التحقق من توفر المنتج كل ثانية بين الساعة 10:03 الى 11:53
 cron.schedule('* * * * * *', () => {
   const now = new Date();
   const hour = now.getHours();
   const minutes = now.getMinutes();
-  if ((hour === 11 && minutes >= 3) || (hour > 11 && hour < 23) || (hour === 23 && minutes <= 53)) {
+  if ((hour === 10 && minutes >= 3) || (hour > 10 && hour < 23) || (hour === 23 && minutes <= 53)) {
     checkAllUrls();
   }
 });
 
 
-// جدولة التحقق من تغير السعر كل 20 ثانية بين الساعة 12:01 الى 11:50
-cron.schedule('*/20 * * * * *', () => {
+// جدولة التحقق من تغير السعر كل 5 ثانية بين الساعة 10:01 الى 11:50
+cron.schedule('*/5 * * * * *', () => {
   const now = new Date();
   const hour = now.getHours();
   const minutes = now.getMinutes();
-  if ((hour === 11 && minutes >= 1) || (hour > 11 && hour < 23) || (hour === 23 && minutes <= 50)) {
+  if ((hour === 10 && minutes >= 1) || (hour > 10 && hour < 23) || (hour === 23 && minutes <= 50)) {
     checkForChange();
   }
 });
