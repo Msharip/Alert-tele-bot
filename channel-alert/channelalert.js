@@ -272,7 +272,6 @@ cron.schedule('* * * * * *', () => {
   const hour = now.getHours();
   const minutes = now.getMinutes();
   if ((hour === 10 && minutes >= 3) || (hour > 10 && hour < 23) || (hour === 23 && minutes <= 53)) {
-    console.log("d");
     checkAllUrls();
   }
 });
