@@ -35,7 +35,7 @@ const twitterClient = new TwitterApi({
   accessSecret: 'y9R2GZa8ZylPT3pR1BEL3ZYD9A5maVPhv7DIstD9AT2cf',
 });
 
-const productCooldown = 50 * 60 * 1000; // فترة التهدئة لكل منتج على حدة: 50 دقيقة بالمللي ثانية
+const productCooldown = 45 * 60 * 1000; // فترة التهدئة لكل منتج على حدة: 45 دقيقة بالمللي ثانية
 let productStatus = {};
 
 urls.forEach(url => {
@@ -111,7 +111,7 @@ cron.schedule('* * * * *', () => {
   const now = new Date();
   const hour = now.getHours();
 
-  if (hour >= 12 && hour <= 16) {
+  if (hour >= 11 && hour <= 16) {
     checkAllUrls();
   }
 });

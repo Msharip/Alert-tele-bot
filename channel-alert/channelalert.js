@@ -122,8 +122,8 @@ const initializePrices = async () => {
   }
 };
 
-const loginNotificationCooldown = 45 * 60 * 1000; // 45 دقائق
-let lastLoginNotificationTime = 0;
+const loginNotificationCooldown = 35 * 60 * 1000; // 35 دقائق
+let lastLoginNotificationTime = {}; // كائن لتخزين وقت آخر إشعار لكل منتج
 
 const checkForChange = async () => {
   for (const url of ['https://www.dzrt.com/ar/icy-rush.html', 'https://www.dzrt.com/ar/seaside-frost.html']) {
@@ -132,11 +132,11 @@ const checkForChange = async () => {
 
     const currentTime = Date.now();
 
-    // تحقق إذا كان السعر تغير من 0 إلى 15 وأرسل الإشعار إذا لم يكن هناك إشعار خلال فترة التهدئة
+    // تحقق إذا كان السعر تغير من 0 إلى 15 وأرسل الإشعار إذا لم يكن هناك إشعار خلال فترة التهدئة الخاصة بالمنتج
     if ((!previousPrices[url] || previousPrices[url] === 0) && newPrice === 15) {
-      if (currentTime - lastLoginNotificationTime > loginNotificationCooldown) {
+      if (!lastLoginNotificationTime[url] || currentTime - lastLoginNotificationTime[url] > loginNotificationCooldown) {
         console.log(`السعر تغير من 0 إلى 15 للمنتج في الرابط: ${url}`);
-        const message = 'المنتج على وشك التوفر , أستعد لتسجيل الدخول';
+        const message = 'المنتج على وشك التوفر , سجل دخول';
 
         const options = {
           reply_markup: {
@@ -152,12 +152,12 @@ const checkForChange = async () => {
         try {
           await bot.sendMessage(channels[url].chatId, message, options);
           console.log(`تم إرسال الإشعار بنجاح إلى القناة: ${channels[url].chatId}`);
-          lastLoginNotificationTime = currentTime; // تحديث وقت آخر إشعار تسجيل دخول
+          lastLoginNotificationTime[url] = currentTime; // تحديث وقت آخر إشعار تسجيل دخول لهذا المنتج
         } catch (error) {
           console.error(`Failed to send notification to ${channels[url].chatId}: ${error.message}`);
         }
       } else {
-        console.log('تم تجاوز إشعار تسجيل الدخول بسبب فترة التهدئة.');
+        console.log(`تم تجاوز إشعار تسجيل الدخول للمنتج في الرابط ${url} بسبب فترة التهدئة.`);
       }
     }
 
@@ -165,6 +165,7 @@ const checkForChange = async () => {
     previousPrices[url] = newPrice;
   }
 };
+
 
 // استدعاء دالة التهيئة عند بدء التشغيل
 (async () => {
@@ -271,6 +272,7 @@ cron.schedule('* * * * * *', () => {
   const hour = now.getHours();
   const minutes = now.getMinutes();
   if ((hour === 10 && minutes >= 3) || (hour > 10 && hour < 23) || (hour === 23 && minutes <= 53)) {
+    console.log("d");
     checkAllUrls();
   }
 });
