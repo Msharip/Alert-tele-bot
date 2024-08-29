@@ -122,7 +122,7 @@ const initializePrices = async () => {
   }
 };
 
-const loginNotificationCooldown = 35 * 60 * 1000; // 35 دقائق
+const loginNotificationCooldown = 25 * 60 * 1000; // 25 دقائق
 let lastLoginNotificationTime = {}; // كائن لتخزين وقت آخر إشعار لكل منتج
 
 const checkForChange = async () => {
@@ -379,9 +379,22 @@ async function deactivateUserSubscription(userId) {
     const deactivateQuery = 'UPDATE users SET activated = 0 WHERE id = ?';
     await connection.query(deactivateQuery, [userId]);
 
-    // إرسال إشعار انتهاء الاشتراك باستخدام sub-bot
-    await axios.post(`${process.env.WEBHOOK_URL}/sendExpiryNotification`, { userId });
+    // إعداد البوت الفرعي باستخدام TOKEN4
+    const subBot = new TelegramBot(process.env.TOKEN4);
 
+    // إرسال إشعار انتهاء الاشتراك للمستخدم مباشرة عبر البوت الفرعي
+    const message = `
+لقد انتهى اشتراكك.\n شكراً لاستخدامك خدمتنا.
+يمكنك تجديد الاشتراك للاستمرار في الاستفادة من الميزات المتاحة.
+
+قم بزيارة الموقع للاشتراك 👇🏻 :
+https://www.dzrtgg.com
+
+طريق التفعيل بنفس تفعيلك السابق.
+    `;
+    await subBot.sendMessage(userId, message);
+
+    // لا حاجة لاستخدام WEBHOOK_URL إذا كان الهدف إرسال رسالة فقط عبر البوت
   } catch (err) {
     console.error('Error deactivating subscription:', err);
   } finally {
@@ -390,7 +403,6 @@ async function deactivateUserSubscription(userId) {
     }
   }
 }
-
 
 async function handleJoinRequests(request) {
   if (request) {
@@ -438,6 +450,6 @@ bot.on('chat_join_request', (request) => {
 });
 
 // جدولة إعادة التحقق من الاشتراكات يوميًا عند الساعة 12:00 بعد منتصف الليل
-cron.schedule('0 0 * * *', () => {
+cron.schedule('00 12 * * *', () => {
   checkUserSubscriptions();
 });
