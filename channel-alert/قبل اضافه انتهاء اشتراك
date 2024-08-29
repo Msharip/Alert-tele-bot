@@ -378,10 +378,6 @@ async function deactivateUserSubscription(userId) {
     connection = await pool.getConnection();
     const deactivateQuery = 'UPDATE users SET activated = 0 WHERE id = ?';
     await connection.query(deactivateQuery, [userId]);
-
-    // إرسال إشعار انتهاء الاشتراك باستخدام sub-bot
-    await axios.post(`${process.env.WEBHOOK_URL}/sendExpiryNotification`, { userId });
-
   } catch (err) {
     console.error('Error deactivating subscription:', err);
   } finally {
@@ -390,7 +386,6 @@ async function deactivateUserSubscription(userId) {
     }
   }
 }
-
 
 async function handleJoinRequests(request) {
   if (request) {
