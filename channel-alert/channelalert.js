@@ -257,32 +257,32 @@ async function checkAllUrls() {
 }
 
 // جدولة تهيئة الأسعار الأولية بين الساعة 10:00 الى 10:45 يوميا
-cron.schedule('00 10 * * *', async () => {
+cron.schedule('00 09 * * *', async () => {
   const now = new Date();
   const hour = now.getHours();
-  if (hour >= 10 && (hour < 22 || (hour === 22 && minutes <= 45))) {
+  if (hour >= 9 && (hour < 22 || (hour === 22 && minutes <= 45))) {
     await initializePrices();
     console.log('تم تهيئة الأسعار الأولية بنجاح.');
   }
 });
 
-// جدولة التحقق من توفر المنتج كل ثانية بين الساعة 10:03 الى 11:53
+// جدولة التحقق من توفر المنتج كل ثانية بين الساعة 09:03 الى 11:53
 cron.schedule('* * * * * *', () => {
   const now = new Date();
   const hour = now.getHours();
   const minutes = now.getMinutes();
-  if ((hour === 10 && minutes >= 3) || (hour > 10 && hour < 23) || (hour === 23 && minutes <= 53)) {
+  if ((hour === 9 && minutes >= 3) || (hour > 9 && hour < 23) || (hour === 23 && minutes <= 53)) {
     checkAllUrls();
   }
 });
 
 
-// جدولة التحقق من تغير السعر كل 5 ثانية بين الساعة 10:01 الى 11:50
+// جدولة التحقق من تغير السعر كل 5 ثانية بين الساعة 09:01 الى 11:50
 cron.schedule('*/5 * * * * *', () => {
   const now = new Date();
   const hour = now.getHours();
   const minutes = now.getMinutes();
-  if ((hour === 10 && minutes >= 1) || (hour > 10 && hour < 23) || (hour === 23 && minutes <= 50)) {
+  if ((hour === 9 && minutes >= 1) || (hour > 9 && hour < 23) || (hour === 23 && minutes <= 50)) {
     checkForChange();
   }
 });
@@ -459,7 +459,7 @@ bot.on('chat_join_request', (request) => {
   handleJoinRequests(request);
 });
 
-cron.schedule('30 04 * * *', () => {
-  console.log("Running Sub")
+cron.schedule('0 0 * * *', () => {
+  console.log("Running Sub Check")
   checkUserSubscriptions();
 });
