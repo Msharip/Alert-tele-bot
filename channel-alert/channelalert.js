@@ -392,9 +392,18 @@ https://www.dzrtgg.com
 
 طريق التفعيل بنفس تفعيلك السابق.
     `;
-    await subBot.sendMessage(userId, message);
 
-    // لا حاجة لاستخدام WEBHOOK_URL إذا كان الهدف إرسال رسالة فقط عبر البوت
+    try {
+      await subBot.sendMessage(userId, message);
+    } catch (err) {
+      if (err.code === 'ETELEGRAM' && err.response.body.description.includes('bot was blocked by the user')) {
+        console.log(`User ${userId} has blocked the bot.`);
+        // يمكنك هنا تسجيل الخطأ أو تجاهله بناءً على الحاجة
+      } else {
+        console.error('Failed to send subscription end message to user:', err);
+      }
+    }
+
   } catch (err) {
     console.error('Error deactivating subscription:', err);
   } finally {
@@ -403,6 +412,7 @@ https://www.dzrtgg.com
     }
   }
 }
+
 
 async function handleJoinRequests(request) {
   if (request) {
@@ -449,7 +459,7 @@ bot.on('chat_join_request', (request) => {
   handleJoinRequests(request);
 });
 
-cron.schedule('17 04 * * *', () => {
+cron.schedule('30 04 * * *', () => {
   console.log("Running Sub")
   checkUserSubscriptions();
 });
