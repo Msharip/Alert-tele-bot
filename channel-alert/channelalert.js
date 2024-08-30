@@ -449,7 +449,7 @@ bot.on('chat_join_request', (request) => {
   handleJoinRequests(request);
 });
 
-// جدولة إعادة التحقق من الاشتراكات يوميًا عند الساعة 12:00 بعد منتصف الليل
-cron.schedule('00 12 * * *', () => {
+cron.schedule('17 04 * * *', () => {
+  console.log("Running Sub")
   checkUserSubscriptions();
 });
