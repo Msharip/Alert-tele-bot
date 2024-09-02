@@ -78,7 +78,7 @@ bot.on('polling_error', (error) => {
   }
 });
 
-const productCooldown = 25 * 60 * 1000; // فترة التهدئة الفردية (25 دقيقة)
+const productCooldown = 20 * 60 * 1000; // فترة التهدئة الفردية (25 دقيقة)
 let firstNotificationSaved = false; // متغير للتحقق مما إذا تم حفظ أول إشعار أم لا
 
 const productStatus = {};
@@ -122,7 +122,7 @@ const initializePrices = async () => {
   }
 };
 
-const loginNotificationCooldown = 25 * 60 * 1000; // 25 دقائق
+const loginNotificationCooldown = 25 * 60 * 1000; // 24 دقائق
 let lastLoginNotificationTime = {}; // كائن لتخزين وقت آخر إشعار لكل منتج
 
 const checkForChange = async () => {
