@@ -10,6 +10,7 @@ require('dotenv').config();
 function delay(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
+
 const productNames = {
   'https://www.dzrt.com/ar/icy-rush.html': { ar: 'آيسي رش', en: 'icy-rush' },
   'https://www.dzrt.com/ar/seaside-frost.html': { ar: 'سي سايد', en: 'seaside-frost' },
@@ -21,6 +22,8 @@ const productNames = {
   'https://www.dzrt.com/ar/purple-mist.html': { ar: 'بيربل مست', en: 'purple-mist' },
   'https://www.dzrt.com/ar/edgy-mint.html': { ar: 'ايدجي منت', en: 'edgy-mint' },
   'https://www.dzrt.com/ar/tamra.html': { ar: 'تمرة', en: 'tamra' },
+
+
 };
 
 const urls = [
@@ -75,96 +78,170 @@ bot.on('polling_error', (error) => {
   }
 });
 
+const productCooldown = 9 * 60 * 1000; // فترة التهدئة الفردية (9 دقيقة)
+let firstNotificationSaved = false; // متغير للتحقق مما إذا تم حفظ أول إشعار أم لا
+
 const productStatus = {};
 
 urls.forEach(url => {
   productStatus[url] = {
     isAvailable: false,
+    lastNotificationTime: 0,
     isNotifying: false,
     isOutOfStockNotified: false,
-    availableStartTime: null,
-    notificationLock: false, // إضافة قفل للإشعار
+    individualCooldownTime: 0,
+    outOfStockStartTime: null
   };
 });
+
+let previousPrices = {};
+
+// الحصول على قيمة السعر للمنتج المحدد
+const getPriceValue = async (url) => {
+  try {
+    const response = await axios.get(url);
+    const pageContent = response.data;
+
+    const priceMatch = pageContent.match(/<meta property="product:price:amount" content="(\d+\.\d+|\d+)"/);
+
+    if (priceMatch && priceMatch[1]) {
+      return parseFloat(priceMatch[1]);
+    } else {
+      return null;
+    }
+  } catch (error) {
+    return null;
+  }
+};
+// الحصول على الأسعار الأولية لجميع المنتجات
+const initializePrices = async () => {
+  for (const url of urls) {
+    const price = await getPriceValue(url);
+    previousPrices[url] = price !== null ? price : 0;
+    console.log(`price for ${url}: ${previousPrices[url]}`);
+  }
+};
+
+const loginNotificationCooldown = 18 * 60 * 1000; // 18 دقائق
+let lastLoginNotificationTime = {}; // كائن لتخزين وقت آخر إشعار لكل منتج
+
+const checkForChange = async () => {
+  for (const url of ['https://www.dzrt.com/ar/icy-rush.html', 'https://www.dzrt.com/ar/seaside-frost.html']) {
+    const newPrice = await getPriceValue(url);
+    if (newPrice === null) continue;
+
+    const currentTime = Date.now();
+
+    // تحقق إذا كان السعر تغير من 0 إلى 15 وأرسل الإشعار إذا لم يكن هناك إشعار خلال فترة التهدئة الخاصة بالمنتج
+    if ((!previousPrices[url] || previousPrices[url] === 0) && newPrice === 15) {
+      if (!lastLoginNotificationTime[url] || currentTime - lastLoginNotificationTime[url] > loginNotificationCooldown) {
+        console.log(`السعر تغير من 0 إلى 15 للمنتج في الرابط: ${url}`);
+        const message = 'المنتج على وشك التوفر , سجل دخول';
+
+        const options = {
+          reply_markup: {
+            inline_keyboard: [
+              [
+                { text: 'تسجيل دخول 🔒', url: 'https://www.dzrt.com/ar/customer/account/login' }
+              ]
+            ]
+          },
+          parse_mode: 'Markdown' // لضمان تنسيق النص في الرسالة
+        };
+
+        try {
+          await bot.sendMessage(channels[url].chatId, message, options);
+          console.log(`تم إرسال الإشعار بنجاح إلى القناة: ${channels[url].chatId}`);
+          lastLoginNotificationTime[url] = currentTime; // تحديث وقت آخر إشعار تسجيل دخول لهذا المنتج
+        } catch (error) {
+          console.error(`Failed to send notification to ${channels[url].chatId}: ${error.message}`);
+        }
+      } else {
+        console.log(`تم تجاوز إشعار تسجيل الدخول للمنتج في الرابط ${url} بسبب فترة التهدئة.`);
+      }
+    }
+
+    // تحديث السعر السابق بعد الفحص
+    previousPrices[url] = newPrice;
+  }
+};
+
+
+// استدعاء دالة التهيئة عند بدء التشغيل
+(async () => {
+  await initializePrices();
+  console.log('تم تهيئة الأسعار الأولية بنجاح عند بدء التشغيل.');
+  checkAllUrls();
+})();
 
 async function checkProductAvailability(url) {
   try {
     const { data } = await axios.get(url);
     const $ = cheerio.load(data);
-    const isAvailable = $('div.stock.available span').length > 0; // تحقق إذا كان المنتج متوفر
+    const isUnavailable = $('div.stock.unavailable span').length > 0;
     const currentTime = Date.now();
 
     if (productNames[url]) {
       const productNameAr = productNames[url].ar;
       const imageUrlAvailable = path.join(__dirname, '..', 'images', `${productNames[url].en}.png`);
-      const localTime = moment(currentTime).tz('Asia/Riyadh').format('YYYY-MM-DD HH:mm:ss');
-      const messageAvailable = `*${productNameAr}* - متوفر الآن ✅`;
 
-      const replyMarkup = {
-        inline_keyboard: [
-          [
-            { text: 'شراء سريع ⚡', url: 'https://www.dzrt.com/ar/onestepcheckout.html' },
-            { text: 'إضافة للسلة 🛒', url: url }
-          ],
-          [
-            { text: 'اعادة الطلب 🔁', url: 'https://www.dzrt.com/ar/sales/order/history/' }
+      // تحقق من أن المنتج متاح حاليًا وأن فترة التهدئة قد انقضت وأنه لم يتم إرسال إشعار بعد
+      if (!isUnavailable && !productStatus[url].isAvailable && !productStatus[url].isNotifying && (currentTime - productStatus[url].individualCooldownTime > productCooldown)) {
+        productStatus[url].isNotifying = true;  // تفعيل القفل لمنع إرسال إشعارات متكررة
+
+        const localTime = moment(currentTime).tz('Asia/Riyadh').format('YYYY-MM-DD HH:mm:ss');
+        const message = `*${productNameAr}* - متوفر الآن ✅`;
+        console.log(`*${productNameAr}* - متوفر الآن ✅`);
+
+        const replyMarkup = {
+          inline_keyboard: [
+            [
+              { text: 'شراء سريع ⚡', url: 'https://www.dzrt.com/ar/onestepcheckout.html' },
+              { text: 'إضافة للسلة 🛒', url: url }
+            ],
+            [
+              { text: 'اعادة الطلب 🔁', url: 'https://www.dzrt.com/ar/sales/order/history/' }
+            ]
           ]
-        ]
-      };
+        };
 
-      if (isAvailable && !productStatus[url].isAvailable && !productStatus[url].notificationLock) {
-        // المنتج أصبح متاحًا
-        console.log(`${productNameAr} ✅ - المنتج متوفر الآن`);
+        // إرسال الإشعار
+        await bot.sendPhoto(mainChannelId, imageUrlAvailable, {
+          caption: message,
+          parse_mode: 'Markdown',
+          reply_markup: JSON.stringify(replyMarkup)
+        });
 
+        await bot.sendPhoto(channels[url].chatId, imageUrlAvailable, {
+          caption: message,
+          parse_mode: 'Markdown',
+          reply_markup: JSON.stringify(replyMarkup)
+        });
+
+        // تحديث حالة المنتج
         productStatus[url].isAvailable = true;
-        productStatus[url].isOutOfStockNotified = false; // إعادة تعيين إشعار النفاد عند توفر المنتج مجددًا
-        productStatus[url].availableStartTime = currentTime;
+        productStatus[url].lastNotificationTime = currentTime;
+        productStatus[url].individualCooldownTime = currentTime;
 
-        if (!productStatus[url].isNotifying) {
-          productStatus[url].isNotifying = true;
-
-          await bot.sendPhoto(mainChannelId, imageUrlAvailable, {
-            caption: messageAvailable,
-            parse_mode: 'Markdown',
-            reply_markup: JSON.stringify(replyMarkup)
-          });
-
-          await bot.sendPhoto(channels[url].chatId, imageUrlAvailable, {
-            caption: messageAvailable,
-            parse_mode: 'Markdown',
-            reply_markup: JSON.stringify(replyMarkup)
-          });
-
-          productStatus[url].isNotifying = false;
-        }
-      }
-
-      const timeAvailable = currentTime - productStatus[url].availableStartTime;
-      const minutesAvailable = Math.floor(timeAvailable / 60000);
-      const secondsAvailable = Math.floor((timeAvailable % 60000) / 1000);
-      const messageOutOfStock = `نفاذ المنتج *${productNameAr}* ❌ \n\n⏳ استمر التوفر لمدة: ${minutesAvailable} دقائق و ${secondsAvailable} ثواني.`;
-
-      if (!isAvailable && productStatus[url].isAvailable && !productStatus[url].isOutOfStockNotified) {
-        // المنتج نفد من المخزون
-        console.log(`${productNameAr} ❌ - المنتج نفذ من المخزون`);
-
-        productStatus[url].isAvailable = false;
-        productStatus[url].isOutOfStockNotified = true; // تمييز أن إشعار النفاد قد تم إرساله
-
-        if (!productStatus[url].isNotifying) {
-          productStatus[url].isNotifying = true;
-
-          await bot.sendMessage(channels[url].chatId, messageOutOfStock, { parse_mode: 'Markdown' });
-          console.log(`إشعار النفاد تم إرساله للمنتج: ${productNameAr}`);
-
-          productStatus[url].isNotifying = false;
-        }
-
-        // قفل إشعار التوفر لمدة دقيقة ونصف (90 ثانية)
-        productStatus[url].notificationLock = true;
+        // إزالة القفل بعد فترة التهدئة
         setTimeout(() => {
-          productStatus[url].notificationLock = false;
-        }, 90000); // 90000 ميلي ثانية تعادل دقيقة ونصف
+          productStatus[url].isNotifying = false;
+        }, productCooldown);
+
+        if (!firstNotificationSaved) {
+          const connection = await pool.getConnection();
+          try {
+            const query = 'INSERT INTO product_notifications (product_url, notification_time) VALUES (?, ?)';
+            await connection.query(query, [url, localTime]);
+            firstNotificationSaved = true;
+          } finally {
+            connection.release();
+          }
+        }
+      } else if (isUnavailable) {
+        // إذا كان المنتج غير متوفر، تحديث الحالة إلى غير متاح
+        productStatus[url].isAvailable = false;
+        productStatus[url].isNotifying = false; // تأكد من إلغاء القفل إذا لم يكن المنتج متاحًا
       }
     }
   } catch (error) {
@@ -179,6 +256,16 @@ async function checkAllUrls() {
   }
 }
 
+// جدولة تهيئة الأسعار الأولية بين الساعة 10:00 الى 10:45 يوميا
+cron.schedule('00 09 * * *', async () => {
+  const now = new Date();
+  const hour = now.getHours();
+  if (hour >= 9 && (hour < 22 || (hour === 22 && minutes <= 45))) {
+    await initializePrices();
+    console.log('تم تهيئة الأسعار الأولية بنجاح.');
+  }
+});
+
 // جدولة التحقق من توفر المنتج كل ثانية بين الساعة 09:03 الى 11:53
 cron.schedule('* * * * * *', () => {
   const now = new Date();
@@ -189,6 +276,16 @@ cron.schedule('* * * * * *', () => {
   }
 });
 
+
+// جدولة التحقق من تغير السعر كل 5 ثانية بين الساعة 09:01 الى 11:50
+cron.schedule('*/5 * * * * *', () => {
+  const now = new Date();
+  const hour = now.getHours();
+  const minutes = now.getMinutes();
+  if ((hour === 9 && minutes >= 1) || (hour > 9 && hour < 23) || (hour === 23 && minutes <= 50)) {
+    checkForChange();
+  }
+});
 
 const dbConfig = {
   host: process.env.DB_HOST,
