@@ -142,7 +142,7 @@ async function checkProductAvailability(url) {
       const timeAvailable = currentTime - productStatus[url].availableStartTime;
       const minutesAvailable = Math.floor(timeAvailable / 60000);
       const secondsAvailable = Math.floor((timeAvailable % 60000) / 1000);
-      const messageOutOfStock = `نفاذ المنتج *${productNameAr}* ❌ \n\n⏳ استمر التوفر لمدة: ${minutesAvailable} دقائق و ${secondsAvailable} ثواني.`;
+      const messageOutOfStock = `نفاذ المنتج *${productNameAr}* ❌ \n\nبقى متوفرا لمدة: ${minutesAvailable} دقائق و ${secondsAvailable} ثواني.`;
 
       if (!isAvailable && productStatus[url].isAvailable && !productStatus[url].isOutOfStockNotified) {
         // المنتج نفد من المخزون
