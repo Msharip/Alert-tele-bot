@@ -282,9 +282,6 @@ async function deactivateUserSubscription(userId) {
     const deactivateQuery = 'UPDATE users SET activated = 0 WHERE id = ?';
     await connection.query(deactivateQuery, [userId]);
 
-    // إعداد البوت الفرعي باستخدام TOKEN4
-    const subBot = new TelegramBot(process.env.TOKEN4);
-
     // إرسال إشعار انتهاء الاشتراك للمستخدم مباشرة عبر البوت الفرعي
     const message = `
 لقد انتهى اشتراكك.\n شكراً لاستخدامك خدمتنا.
@@ -297,12 +294,13 @@ https://www.dzrtgg.com
 اضغط على /start للإرسال القائمه
     `;
 
+    const subBot = new TelegramBot(process.env.TOKEN4, { webHook: true });
+
     try {
       await subBot.sendMessage(userId, message);
     } catch (err) {
       if (err.code === 'ETELEGRAM' && err.response.body.description.includes('bot was blocked by the user')) {
         console.log(`User ${userId} has blocked the bot.`);
-        // يمكنك هنا تسجيل الخطأ أو تجاهله بناءً على الحاجة
       } else {
         console.error('Failed to send subscription end message to user:', err);
       }
