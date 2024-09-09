@@ -18,6 +18,7 @@ const productNames = {
   'https://www.dzrt.com/ar/mint-fusion.html': { ar: 'منت فيوجن', en: 'mint-fusion' },
   'https://www.dzrt.com/ar/haila.html': { ar: 'هيلة', en: 'haila' },
   'https://www.dzrt.com/ar/samra.html': { ar: 'سمرة', en: 'samra' },
+  'https://www.dzrt.com/ar/dzrt-samra-special-edition.html': { ar: 'سمرة - أصدار خاص', en: 'samra-ed' },
   'https://www.dzrt.com/ar/purple-mist.html': { ar: 'بيربل مست', en: 'purple-mist' },
   'https://www.dzrt.com/ar/edgy-mint.html': { ar: 'ايدجي منت', en: 'edgy-mint' },
   'https://www.dzrt.com/ar/tamra.html': { ar: 'تمرة', en: 'tamra' },
@@ -32,6 +33,7 @@ const urls = [
   'https://www.dzrt.com/ar/mint-fusion.html',
   'https://www.dzrt.com/ar/haila.html',
   'https://www.dzrt.com/ar/samra.html',
+  'https://www.dzrt.com/ar/dzrt-samra-special-edition.html',
   'https://www.dzrt.com/ar/purple-mist.html',
   'https://www.dzrt.com/ar/edgy-mint.html',
 ];
@@ -44,6 +46,7 @@ const channels = {
   'https://www.dzrt.com/ar/mint-fusion.html': { ar: 'منت فيوجن', en: 'mint-fusion', chatId: process.env.CHAT_ID_MINT },
   'https://www.dzrt.com/ar/haila.html': { ar: 'هيلة', en: 'haila', chatId: process.env.CHAT_ID_HAILA },
   'https://www.dzrt.com/ar/samra.html': { ar: 'سمرة', en: 'samra', chatId: process.env.CHAT_ID_SAMRA },
+  'https://www.dzrt.com/ar/dzrt-samra-special-edition.html': { ar: 'سمرة - أصدار خاص', en: 'samra-ed', chatId: process.env.CHAT_ID_SAMRA },
   'https://www.dzrt.com/ar/purple-mist.html': { ar: 'بيربل مست', en: 'purple-mist', chatId: process.env.CHAT_ID_PURPPLE },
   'https://www.dzrt.com/ar/edgy-mint.html': { ar: 'ايدجي منت', en: 'edgy-mint', chatId: process.env.CHAT_ID_EDGY },
   'https://www.dzrt.com/ar/tamra.html': { ar: 'تمرة', en: 'tamra', chatId: process.env.CHAT_ID_TAMRA },
