@@ -5,6 +5,7 @@ const cron = require('node-cron');
 const path = require('path');
 const mysql = require('mysql2/promise');
 const moment = require('moment-timezone');
+const cloudscraper = require('cloudscraper'); // تأكد من تثبيت المكتبة عبر npm
 require('dotenv').config();
 
 function delay(ms) {
@@ -79,6 +80,83 @@ bot.on('polling_error', (error) => {
 });
 
 
+let lastLoginNotificationTime = {}; // كائن لتخزين وقت آخر إشعار لكل منتج
+let loginNotificationLock = {}; // كائن لتخزين قفل إشعارات السعر لكل منتج
+let previousPrices = {}; // كائن لتخزين الأسعار السابقة
+
+const getPriceDetails = async (url) => {
+  try {
+    const pageContent = await cloudscraper.get(url);
+    const priceMetaMatch = pageContent.match(/<meta property="product:price:amount" content="(\d+\.\d+|\d+)"/);
+    const priceInfoMatch = pageContent.match(/"final_price":(\d+\.\d+|\d+)/);
+    const gtagMatch = pageContent.match(/gtag\(\{event:'view_item',ecommerce : \{.*value: (\d+\.\d+|\d+)/);
+
+    const priceMeta = priceMetaMatch ? parseFloat(priceMetaMatch[1]) : null;
+    const priceInfo = priceInfoMatch ? parseFloat(priceInfoMatch[1]) : null;
+    const gtagValue = gtagMatch ? parseFloat(gtagMatch[1]) : null;
+/*
+    console.log(`Meta price: ${priceMeta}`);
+    console.log(`Final price: ${priceInfo}`);
+    console.log(`Gtag value: ${gtagValue}`);
+*/
+    return {
+      priceMeta,
+      priceInfo,
+      gtagValue
+    };
+  } catch (error) {
+    return null;
+  }
+};
+
+const checkForChange = async () => {
+  const productUrls = ['https://www.dzrt.com/ar/icy-rush.html', 'https://www.dzrt.com/ar/seaside-frost.html'];
+
+  for (const url of productUrls) {
+    const details = await getPriceDetails(url);
+    if (!details) continue;
+
+    const currentTime = Date.now();
+
+    // تحقق إذا كانت جميع الشروط متحققة لتغير السعر وإرسال الإشعار
+    if ((!previousPrices[url] || previousPrices[url] === 0) &&
+        details.priceMeta === 15 &&
+        details.priceInfo === 15 &&
+        details.gtagValue === 15 &&
+        !loginNotificationLock[url] ) {  // تحقق إذا لم يكن هناك قفل للإشعار أو نفاد المنتج
+
+      console.log(`السعر تغير من 0 إلى 15 للمنتج في الرابط: ${url}`);
+      const message = 'المنتج على وشك التوفر , سجل دخول';
+
+      const options = {
+        reply_markup: {
+          inline_keyboard: [
+            [
+              { text: 'تسجيل دخول 🔒', url: 'https://www.dzrt.com/ar/customer/account/login' }
+            ]
+          ]
+        },
+        parse_mode: 'Markdown'
+      };
+
+      try {
+        await bot.sendMessage(channels[url].chatId, message, options);
+        console.log(`تم إرسال الإشعار بنجاح إلى القناة: ${channels[url].chatId}`);
+
+        lastLoginNotificationTime[url] = currentTime;
+        loginNotificationLock[url] = true;  // قفل بعد إرسال إشعار تغير السعر
+
+        // القفل يظل موجودًا حتى ينفد المنتج (لا يوجد مدة هنا، يتم فك القفل عند نفاد المنتج)
+      } catch (error) {
+        console.error(`Failed to send notification to ${channels[url].chatId}: ${error.message}`);
+      }
+    }
+
+    // تحديث السعر السابق بعد الفحص
+    previousPrices[url] = details.priceMeta;
+  }
+};
+
 const productStatus = {};
 
 urls.forEach(url => {
@@ -91,9 +169,9 @@ urls.forEach(url => {
   };
 });
 
-async function checkProductAvailability(url) {
+const checkProductAvailability = async (url) => {
   try {
-    const { data } = await axios.get(url);
+    const data = await cloudscraper.get(url);
     const $ = cheerio.load(data);
     const isAvailable = $('div.stock.available span').length > 0; // تحقق إذا كان المنتج متوفر
     const currentTime = Date.now();
@@ -116,7 +194,7 @@ async function checkProductAvailability(url) {
         ]
       };
 
-      if (isAvailable && !productStatus[url].isAvailable && !productStatus[url].notificationLock) {
+      if (isAvailable && !productStatus[url].isAvailable) {
         // المنتج أصبح متاحًا
         console.log(`${productNameAr} ✅ - المنتج متوفر الآن`);
 
@@ -124,23 +202,18 @@ async function checkProductAvailability(url) {
         productStatus[url].isOutOfStockNotified = false; // إعادة تعيين إشعار النفاد عند توفر المنتج مجددًا
         productStatus[url].availableStartTime = currentTime;
 
-        if (!productStatus[url].isNotifying) {
-          productStatus[url].isNotifying = true;
+        await bot.sendPhoto(mainChannelId, imageUrlAvailable, {
+          caption: messageAvailable,
+          parse_mode: 'Markdown',
+          reply_markup: JSON.stringify(replyMarkup)
+        });
 
-          await bot.sendPhoto(mainChannelId, imageUrlAvailable, {
-            caption: messageAvailable,
-            parse_mode: 'Markdown',
-            reply_markup: JSON.stringify(replyMarkup)
-          });
-
-          await bot.sendPhoto(channels[url].chatId, imageUrlAvailable, {
-            caption: messageAvailable,
-            parse_mode: 'Markdown',
-            reply_markup: JSON.stringify(replyMarkup)
-          });
-
-          productStatus[url].isNotifying = false;
-        }
+        // إرسال إشعار التوفر
+        await bot.sendPhoto(channels[url].chatId, imageUrlAvailable, {
+          caption: messageAvailable,
+          parse_mode: 'Markdown',
+          reply_markup: JSON.stringify(replyMarkup)
+        });
       }
 
       const timeAvailable = currentTime - productStatus[url].availableStartTime;
@@ -148,32 +221,33 @@ async function checkProductAvailability(url) {
       const secondsAvailable = Math.floor((timeAvailable % 60000) / 1000);
       const messageOutOfStock = `نفاذ المنتج *${productNameAr}* ❌ \n\nبقى متوفرا لمدة: ${minutesAvailable} دقائق و ${secondsAvailable} ثواني.`;
 
-      if (!isAvailable && productStatus[url].isAvailable && !productStatus[url].isOutOfStockNotified) {
+      if (!isAvailable && productStatus[url].isAvailable) {
         // المنتج نفد من المخزون
         console.log(`${productNameAr} ❌ - المنتج نفذ من المخزون`);
 
         productStatus[url].isAvailable = false;
-        productStatus[url].isOutOfStockNotified = true; // تمييز أن إشعار النفاد قد تم إرساله
 
-        if (!productStatus[url].isNotifying) {
-          productStatus[url].isNotifying = true;
-
-          await bot.sendMessage(channels[url].chatId, messageOutOfStock, { parse_mode: 'Markdown' });
-          console.log(`إشعار النفاد تم إرساله للمنتج: ${productNameAr}`);
-
-          productStatus[url].isNotifying = false;
-        }
+        // إرسال إشعار النفاد
+        await bot.sendMessage(channels[url].chatId, messageOutOfStock, { parse_mode: 'Markdown' });
+        console.log(`إشعار النفاد تم إرساله للمنتج: ${productNameAr}`);
 
         // قفل إشعار التوفر لمدة دقيقة ونصف (90 ثانية)
         productStatus[url].notificationLock = true;
         setTimeout(() => {
           productStatus[url].notificationLock = false;
         }, 90000); // 90000 ميلي ثانية تعادل دقيقة ونصف
+
+        // إضافة قفل لمدة 18 دقيقة بعد نفاد المنتج يمنع إشعارات السعر
+        loginNotificationLock[url] = true;
+        setTimeout(() => {
+          loginNotificationLock[url] = false;
+          console.log(`تم فك قفل إشعارات السعر بعد نفاد المنتج: ${productNameAr}`);
+        }, 18 * 60 * 1000); // 18 دقائق
       }
     }
   } catch (error) {
   }
-}
+};
 
 async function checkAllUrls() {
   for (const url of urls) {
@@ -183,12 +257,39 @@ async function checkAllUrls() {
   }
 }
 
-// جدولة التحقق من توفر المنتج كل ثانية بين الساعة 09:03 الى 11:53
+
+cron.schedule('*/2 * * * * *', () => {
+  const now = new Date();
+  const hour = now.getHours();
+  const minutes = now.getMinutes();
+
+  // الفحص بين 9:01 صباحاً و11:55 مساءً
+  if (
+    (hour === 9 && minutes >= 1) ||  // يبدأ من 9:01 صباحاً
+    (hour > 9 && hour < 23) ||       // يستمر حتى 11 مساءً
+    (hour === 23 && minutes <= 55)   // يتوقف عند الساعة 11:55 مساءً
+  ) {
+    checkForChange();
+  }
+
+  // الفحص بين 12:01 صباحاً و6:00 صباحاً
+  if (
+    (hour === 0 && minutes >= 1) ||  // يبدأ من الساعة 12:01 صباحاً
+    (hour > 0 && hour < 6) ||        // يستمر حتى 6:00 صباحاً
+    (hour === 6 && minutes === 0)    // يتوقف عند 6:00 صباحاً
+  ) {
+    checkForChange();
+  }
+});
+
+
 cron.schedule('* * * * * *', () => {
   const now = new Date();
   const hour = now.getHours();
   const minutes = now.getMinutes();
-  if ((hour === 9 && minutes >= 3) || (hour > 9 && hour < 23) || (hour === 23 && minutes <= 53)) {
+  // الفحص بين 09:03 صباحاً و6:00 صباحاً
+  if ( (hour === 9 && minutes >= 3) || (hour > 9 || hour < 6) || (hour === 6 && minutes === 0)
+  ) {
     checkAllUrls();
   }
 });
