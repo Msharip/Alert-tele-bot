@@ -171,7 +171,7 @@ urls.forEach(url => {
 
 const checkProductAvailability = async (url) => {
   try {
-    const data = await cloudscraper.get(url);
+    const { data } = await axios.get(url);
     const $ = cheerio.load(data);
     const isAvailable = $('div.stock.available span').length > 0; // تحقق إذا كان المنتج متوفر
     const currentTime = Date.now();
@@ -219,7 +219,7 @@ const checkProductAvailability = async (url) => {
       const timeAvailable = currentTime - productStatus[url].availableStartTime;
       const minutesAvailable = Math.floor(timeAvailable / 60000);
       const secondsAvailable = Math.floor((timeAvailable % 60000) / 1000);
-      const messageOutOfStock = `نفاذ المنتج *${productNameAr}* ❌ \n\nبقى متوفرا لمدة: ${minutesAvailable} دقائق و ${secondsAvailable} ثواني.`;
+      const messageOutOfStock = `نفذ المنتج *${productNameAr}* ❌ \n\nبقى متوفرا لمدة: ${minutesAvailable} دقائق و ${secondsAvailable} ثواني.`;
 
       if (!isAvailable && productStatus[url].isAvailable) {
         // المنتج نفد من المخزون
@@ -258,7 +258,7 @@ async function checkAllUrls() {
 }
 
 
-cron.schedule('*/2 * * * * *', () => {
+cron.schedule('* * * * * *', () => {
   const now = new Date();
   const hour = now.getHours();
   const minutes = now.getMinutes();
