@@ -168,7 +168,6 @@ urls.forEach(url => {
     notificationLock: false, // إضافة قفل للإشعار
   };
 });
-
 async function checkProductAvailability(url) {
   try {
     const { data } = await axios.get(url);
@@ -205,13 +204,13 @@ async function checkProductAvailability(url) {
         if (!productStatus[url].isNotifying) {
           productStatus[url].isNotifying = true;
 
-          await bot.sendPhoto(mainChannelId, imageUrlAvailable, {
+          await bot.sendPhoto(channels[url].chatId, imageUrlAvailable, {
             caption: messageAvailable,
             parse_mode: 'Markdown',
             reply_markup: JSON.stringify(replyMarkup)
           });
 
-          await bot.sendPhoto(channels[url].chatId, imageUrlAvailable, {
+          await bot.sendPhoto(mainChannelId, imageUrlAvailable, {
             caption: messageAvailable,
             parse_mode: 'Markdown',
             reply_markup: JSON.stringify(replyMarkup)
@@ -248,18 +247,22 @@ async function checkProductAvailability(url) {
           productStatus[url].notificationLock = false;
         }, 90000); // 90000 ميلي ثانية تعادل دقيقة ونصف
 
+        // إعادة تعيين قفل السعر إذا نفد المنتج مجددًا
+        if (loginNotificationLock[url]) {
+          clearTimeout(loginNotificationLock[url]); // إلغاء القفل القديم إذا كان موجودًا
+        }
+        
         // إضافة قفل لمدة 18 دقيقة بعد نفاد المنتج يمنع إشعارات السعر
-        loginNotificationLock[url] = true;
-        setTimeout(() => {
-        loginNotificationLock[url] = false;
-        console.log(`تم فك قفل إشعارات السعر بعد نفاد المنتج: ${productNameAr}`);
+        loginNotificationLock[url] = setTimeout(() => {
+          loginNotificationLock[url] = false;
+          console.log(` تم اعادة تعيين فك القفل السعر بعد نفاد المنتج مره اخرى - ${productNameAr}`);           
         }, 18 * 60 * 1000); // 18 دقائق
-
       }
     }
   } catch (error) {
   }
-};
+}
+
 
 async function checkAllUrls() {
   for (const url of urls) {
