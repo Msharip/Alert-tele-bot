@@ -157,6 +157,7 @@ const checkForChange = async () => {
   }
 };
 
+
 const productStatus = {};
 
 urls.forEach(url => {
@@ -169,7 +170,7 @@ urls.forEach(url => {
   };
 });
 
-const checkProductAvailability = async (url) => {
+async function checkProductAvailability(url) {
   try {
     const { data } = await axios.get(url);
     const $ = cheerio.load(data);
@@ -194,7 +195,7 @@ const checkProductAvailability = async (url) => {
         ]
       };
 
-      if (isAvailable && !productStatus[url].isAvailable) {
+      if (isAvailable && !productStatus[url].isAvailable && !productStatus[url].notificationLock) {
         // المنتج أصبح متاحًا
         console.log(`${productNameAr} ✅ - المنتج متوفر الآن`);
 
@@ -202,52 +203,65 @@ const checkProductAvailability = async (url) => {
         productStatus[url].isOutOfStockNotified = false; // إعادة تعيين إشعار النفاد عند توفر المنتج مجددًا
         productStatus[url].availableStartTime = currentTime;
 
-        await bot.sendPhoto(mainChannelId, imageUrlAvailable, {
-          caption: messageAvailable,
-          parse_mode: 'Markdown',
-          reply_markup: JSON.stringify(replyMarkup)
-        });
+        if (!productStatus[url].isNotifying) {
+          productStatus[url].isNotifying = true;
 
-        // إرسال إشعار التوفر
-        await bot.sendPhoto(channels[url].chatId, imageUrlAvailable, {
-          caption: messageAvailable,
-          parse_mode: 'Markdown',
-          reply_markup: JSON.stringify(replyMarkup)
-        });
+          await bot.sendPhoto(mainChannelId, imageUrlAvailable, {
+            caption: messageAvailable,
+            parse_mode: 'Markdown',
+            reply_markup: JSON.stringify(replyMarkup)
+          });
+
+          await bot.sendPhoto(channels[url].chatId, imageUrlAvailable, {
+            caption: messageAvailable,
+            parse_mode: 'Markdown',
+            reply_markup: JSON.stringify(replyMarkup)
+          });
+
+          productStatus[url].isNotifying = false;
+        }
       }
 
       const timeAvailable = currentTime - productStatus[url].availableStartTime;
       const minutesAvailable = Math.floor(timeAvailable / 60000);
       const secondsAvailable = Math.floor((timeAvailable % 60000) / 1000);
-      const messageOutOfStock = `نفذ المنتج *${productNameAr}* ❌ \n\nبقى متوفرا لمدة: ${minutesAvailable} دقائق و ${secondsAvailable} ثواني.`;
+      const messageOutOfStock = `نفاذ المنتج *${productNameAr}* ❌ \n\nبقى متوفرا لمدة: ${minutesAvailable} دقائق و ${secondsAvailable} ثواني.`;
 
-      if (!isAvailable && productStatus[url].isAvailable) {
+      if (!isAvailable && productStatus[url].isAvailable && !productStatus[url].isOutOfStockNotified) {
         // المنتج نفد من المخزون
         console.log(`${productNameAr} ❌ - المنتج نفذ من المخزون`);
 
         productStatus[url].isAvailable = false;
+        productStatus[url].isOutOfStockNotified = true; // تمييز أن إشعار النفاد قد تم إرساله
 
-        // إرسال إشعار النفاد
-        await bot.sendMessage(channels[url].chatId, messageOutOfStock, { parse_mode: 'Markdown' });
-        console.log(`إشعار النفاد تم إرساله للمنتج: ${productNameAr}`);
+        if (!productStatus[url].isNotifying) {
+          productStatus[url].isNotifying = true;
+
+          await bot.sendMessage(channels[url].chatId, messageOutOfStock, { parse_mode: 'Markdown' });
+          console.log(`إشعار النفاد تم إرساله للمنتج: ${productNameAr}`);
+
+          productStatus[url].isNotifying = false;
+        }
 
         // قفل إشعار التوفر لمدة دقيقة ونصف (90 ثانية)
         productStatus[url].notificationLock = true;
         setTimeout(() => {
           productStatus[url].notificationLock = false;
         }, 90000); // 90000 ميلي ثانية تعادل دقيقة ونصف
+        
+                // إضافة قفل لمدة 18 دقيقة بعد نفاد المنتج يمنع إشعارات السعر
+                loginNotificationLock[url] = true;
+                setTimeout(() => {
+                  loginNotificationLock[url] = false;
+                  console.log(`تم فك قفل إشعارات السعر بعد نفاد المنتج: ${productNameAr}`);
+                }, 18 * 60 * 1000); // 18 دقائق
 
-        // إضافة قفل لمدة 18 دقيقة بعد نفاد المنتج يمنع إشعارات السعر
-        loginNotificationLock[url] = true;
-        setTimeout(() => {
-          loginNotificationLock[url] = false;
-          console.log(`تم فك قفل إشعارات السعر بعد نفاد المنتج: ${productNameAr}`);
-        }, 18 * 60 * 1000); // 18 دقائق
+                
       }
     }
   } catch (error) {
   }
-};
+}
 
 async function checkAllUrls() {
   for (const url of urls) {
