@@ -251,9 +251,7 @@ async function checkProductAvailability(url) {
         if (loginNotificationLock[url]) {
           clearTimeout(loginNotificationLock[url]); // إلغاء القفل القديم إذا كان موجودًا
         }
-        
-        // إضافة قفل لمدة 18 دقيقة بعد نفاد المنتج يمنع إشعارات السعر
-        loginNotificationLock[url] = setTimeout(() => {
+          loginNotificationLock[url] = setTimeout(() => {
           loginNotificationLock[url] = false;
           console.log(` تم اعادة تعيين فك القفل السعر بعد نفاد المنتج مره اخرى - ${productNameAr}`);           
         }, 18 * 60 * 1000); // 18 دقائق
