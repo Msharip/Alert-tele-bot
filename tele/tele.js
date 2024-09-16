@@ -5,7 +5,6 @@ const cron = require('node-cron');
 const { TwitterApi } = require('twitter-api-v2');
 const path = require('path');
 
-module.exports = function(app) {
   const productNames = {
     'https://www.dzrt.com/ar/highland-berries.html': { ar: 'هايلاند بيريز', en: 'highland-berries' },
     'https://www.dzrt.com/ar/garden-mint.html': { ar: 'جاردن منت', en: 'garden-mint' },
@@ -20,22 +19,16 @@ module.exports = function(app) {
     'https://www.dzrt.com/ar/dzrt-samra-special-edition.html'
   ];
 
-  // Telegram bot setup with Webhook
   const token = '6749756089:AAFMCjy0-85EkyQIrzC4tJU5jIyFJvpnLEI';
-  const chatId = '-1002122565496'; // Only one channel (Main channel)
-  const bot = new TelegramBot(token, { webHook: true });
-
-  // إعداد Webhook مع رابط Heroku الخاص بك
-  const webhookUrl = 'https://allbot-test-v2-3a0e0fd50f61.herokuapp.com/' + token;
-  bot.setWebHook(webhookUrl);
-
+  const chatId = '-1002122565496';
+  const bot = new TelegramBot(token);
+  
   const twitterClient = new TwitterApi({
     appKey: 'HrFfThKnzlbiuVXk2rBMfAndA',
     appSecret: 'NCejLvJb5E8RFfXGGw6lqGH7yqXUhSvjZsZPBthAmFVhhAR095',
     accessToken: '1791965388164440064-6p4RaldWOBEk4XLTlVaXrbT5C0JGVi',
     accessSecret: 'y9R2GZa8ZylPT3pR1BEL3ZYD9A5maVPhv7DIstD9AT2cf',
-
-});
+  });
 
 // Initialize product status
 const productStatus = {};
@@ -60,7 +53,6 @@ async function checkProductAvailability(url) {
     if (productNames[url]) {
       const productNameAr = productNames[url].ar;
       const imageUrlAvailable = path.join(__dirname, '..', 'images', `${productNames[url].en}.png`);
-      const localTime = moment(currentTime).tz('Asia/Riyadh').format('YYYY-MM-DD HH:mm:ss');
       const messageAvailable = `*${productNameAr}* - متوفر الآن ✅`;
 
       const replyMarkup = {
@@ -68,6 +60,9 @@ async function checkProductAvailability(url) {
           [
             { text: ' المنتجات 📦', url: 'https://www.dzrt.com/ar/our-products.html' },
             { text: 'إضافة للسلة 🛒', url: url }
+          ],
+          [
+            { text: 'تسجيل دخول 🔑', url: 'https://www.dzrt.com/ar/customer/account/login' }
           ]
         ]
       };
@@ -135,7 +130,6 @@ async function checkProductAvailability(url) {
       }
     }
   } catch (error) {
-    console.error(error);
   }
 }
 
@@ -156,9 +150,3 @@ cron.schedule('* * * * *', () => {
     checkAllUrls();
   }
 });
-
-app.post(`/${token}`, (req, res) => {
-  bot.processUpdate(req.body);
-  res.sendStatus(200);
-});
-};
