@@ -18,7 +18,7 @@ const productNames = {
   'https://www.dzrt.com/ar/garden-mint.html': { ar: 'جاردن منت', en: 'garden-mint' },
   'https://www.dzrt.com/ar/mint-fusion.html': { ar: 'منت فيوجن', en: 'mint-fusion' },
   'https://www.dzrt.com/ar/haila.html': { ar: 'هيلة', en: 'haila' },
-  'https://www.dzrt.com/ar/samra.html': { ar: 'سمرة', en: 'samra' },
+//  'https://www.dzrt.com/ar/samra.html': { ar: 'سمرة', en: 'samra' },
   'https://www.dzrt.com/ar/dzrt-samra-special-edition.html': { ar: 'سمرة - أصدار خاص', en: 'samra-ed' },
   'https://www.dzrt.com/ar/purple-mist.html': { ar: 'بيربل مست', en: 'purple-mist' },
   'https://www.dzrt.com/ar/edgy-mint.html': { ar: 'ايدجي منت', en: 'edgy-mint' },
@@ -33,7 +33,7 @@ const urls = [
   'https://www.dzrt.com/ar/garden-mint.html',
   'https://www.dzrt.com/ar/mint-fusion.html',
   'https://www.dzrt.com/ar/haila.html',
-  'https://www.dzrt.com/ar/samra.html',
+ // 'https://www.dzrt.com/ar/samra.html',
   'https://www.dzrt.com/ar/dzrt-samra-special-edition.html',
   'https://www.dzrt.com/ar/purple-mist.html',
   'https://www.dzrt.com/ar/edgy-mint.html',
@@ -46,7 +46,7 @@ const channels = {
   'https://www.dzrt.com/ar/garden-mint.html': { ar: 'جاردن منت', en: 'garden-mint', chatId: process.env.CHAT_ID_GARDEN },
   'https://www.dzrt.com/ar/mint-fusion.html': { ar: 'منت فيوجن', en: 'mint-fusion', chatId: process.env.CHAT_ID_MINT },
   'https://www.dzrt.com/ar/haila.html': { ar: 'هيلة', en: 'haila', chatId: process.env.CHAT_ID_HAILA },
-  'https://www.dzrt.com/ar/samra.html': { ar: 'سمرة', en: 'samra', chatId: process.env.CHAT_ID_SAMRA },
+//  'https://www.dzrt.com/ar/samra.html': { ar: 'سمرة', en: 'samra', chatId: process.env.CHAT_ID_SAMRA },
   'https://www.dzrt.com/ar/dzrt-samra-special-edition.html': { ar: 'سمرةأصدار خاص', en: 'samra-ed', chatId: process.env.CHAT_ID_SAMRA },
   'https://www.dzrt.com/ar/purple-mist.html': { ar: 'بيربل مست', en: 'purple-mist', chatId: process.env.CHAT_ID_PURPPLE },
   'https://www.dzrt.com/ar/edgy-mint.html': { ar: 'ايدجي منت', en: 'edgy-mint', chatId: process.env.CHAT_ID_EDGY },
@@ -78,7 +78,6 @@ bot.on('polling_error', (error) => {
     }, 5000);
   }
 });
-
 
 let lastLoginNotificationTime = {}; // كائن لتخزين وقت آخر إشعار لكل منتج
 let loginNotificationLock = {}; // كائن لتخزين قفل إشعارات السعر لكل منتج
@@ -253,7 +252,7 @@ async function checkProductAvailability(url) {
         }
           loginNotificationLock[url] = setTimeout(() => {
           loginNotificationLock[url] = false;
-          console.log(` تم اعادة تعيين فك القفل السعر بعد نفاد المنتج مره اخرى - ${productNameAr}`);           
+          console.log(`فك القفل السعر : ${productNameAr}`);           
         }, 18 * 60 * 1000); // 18 دقائق
       }
     }
