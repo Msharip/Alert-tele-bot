@@ -5,32 +5,36 @@ const cron = require('node-cron');
 const { TwitterApi } = require('twitter-api-v2');
 const path = require('path');
 
+module.exports = function(app) {
+  const productNames = {
+    'https://www.dzrt.com/ar/highland-berries.html': { ar: 'هايلاند بيريز', en: 'highland-berries' },
+    'https://www.dzrt.com/ar/garden-mint.html': { ar: 'جاردن منت', en: 'garden-mint' },
+    'https://www.dzrt.com/ar/mint-fusion.html': { ar: 'منت فيوجن', en: 'mint-fusion' },
+    'https://www.dzrt.com/ar/dzrt-samra-special-edition.html': { ar: 'سمرة - أصدار خاص', en: 'samra-ed' }
+  };
 
-const productNames = {
-  'https://www.dzrt.com/ar/highland-berries.html': { ar: 'هايلاند بيريز', en: 'highland-berries' },
-  'https://www.dzrt.com/ar/garden-mint.html': { ar: 'جاردن منت', en: 'garden-mint' },
-  'https://www.dzrt.com/ar/mint-fusion.html': { ar: 'منت فيوجن', en: 'mint-fusion' },
-  'https://www.dzrt.com/ar/dzrt-samra-special-edition.html': { ar: 'سمرة - أصدار خاص', en: 'samra-ed' }
-};
+  const urls = [
+    'https://www.dzrt.com/ar/highland-berries.html',
+    'https://www.dzrt.com/ar/garden-mint.html',
+    'https://www.dzrt.com/ar/mint-fusion.html',
+    'https://www.dzrt.com/ar/dzrt-samra-special-edition.html'
+  ];
 
-const urls = [
-  'https://www.dzrt.com/ar/highland-berries.html',
-  'https://www.dzrt.com/ar/garden-mint.html',
-  'https://www.dzrt.com/ar/mint-fusion.html',
-  'https://www.dzrt.com/ar/dzrt-samra-special-edition.html'
-];
+  // Telegram bot setup with Webhook
+  const token = '6749756089:AAFMCjy0-85EkyQIrzC4tJU5jIyFJvpnLEI';
+  const chatId = '-1002122565496'; // Only one channel (Main channel)
+  const bot = new TelegramBot(token, { webHook: true });
 
-// Telegram bot setup
-const token = '6749756089:AAFMCjy0-85EkyQIrzC4tJU5jIyFJvpnLEI';
-const chatId = '-1002122565496'; // Only one channel (Main channel)
-const bot = new TelegramBot(token, { polling: true });
+  // إعداد Webhook مع رابط Heroku الخاص بك
+  const webhookUrl = 'https://allbot-test-v2-3a0e0fd50f61.herokuapp.com/' + token;
+  bot.setWebHook(webhookUrl);
 
-// Twitter client setup
-const twitterClient = new TwitterApi({
-  appKey: 'HrFfThKnzlbiuVXk2rBMfAndA',
-  appSecret: 'NCejLvJb5E8RFfXGGw6lqGH7yqXUhSvjZsZPBthAmFVhhAR095',
-  accessToken: '1791965388164440064-6p4RaldWOBEk4XLTlVaXrbT5C0JGVi',
-  accessSecret: 'y9R2GZa8ZylPT3pR1BEL3ZYD9A5maVPhv7DIstD9AT2cf',
+  const twitterClient = new TwitterApi({
+    appKey: 'HrFfThKnzlbiuVXk2rBMfAndA',
+    appSecret: 'NCejLvJb5E8RFfXGGw6lqGH7yqXUhSvjZsZPBthAmFVhhAR095',
+    accessToken: '1791965388164440064-6p4RaldWOBEk4XLTlVaXrbT5C0JGVi',
+    accessSecret: 'y9R2GZa8ZylPT3pR1BEL3ZYD9A5maVPhv7DIstD9AT2cf',
+
 });
 
 // Initialize product status
@@ -152,3 +156,9 @@ cron.schedule('* * * * *', () => {
     checkAllUrls();
   }
 });
+
+app.post(`/${token}`, (req, res) => {
+  bot.processUpdate(req.body);
+  res.sendStatus(200);
+});
+};
