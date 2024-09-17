@@ -5,19 +5,16 @@ const cron = require('node-cron');
 const { TwitterApi } = require('twitter-api-v2');
 const path = require('path');
 
-  const productNames = {
-    'https://www.dzrt.com/ar/highland-berries.html': { ar: 'هايلاند بيريز', en: 'highland-berries' },
-    'https://www.dzrt.com/ar/garden-mint.html': { ar: 'جاردن منت', en: 'garden-mint' },
-    'https://www.dzrt.com/ar/mint-fusion.html': { ar: 'منت فيوجن', en: 'mint-fusion' },
-    'https://www.dzrt.com/ar/dzrt-samra-special-edition.html': { ar: 'سمرة - أصدار خاص', en: 'samra-ed' }
-  };
+// استيراد بيانات المنتجات من الملف الجديد
+const { productNames, urls, channels } = require('../products'); // التأكد من المسار الصحيح
 
-  const urls = [
-    'https://www.dzrt.com/ar/highland-berries.html',
-    'https://www.dzrt.com/ar/garden-mint.html',
-    'https://www.dzrt.com/ar/mint-fusion.html',
-    'https://www.dzrt.com/ar/dzrt-samra-special-edition.html'
-  ];
+// تحديد الروابط التي تريد استخدامها في البوت الأول فقط
+const urlsBot1 = [
+  'https://www.dzrt.com/ar/highland-berries.html',
+  'https://www.dzrt.com/ar/garden-mint.html',
+  'https://www.dzrt.com/ar/mint-fusion.html',
+  'https://www.dzrt.com/ar/dzrt-samra-special-edition.html'
+];
 
   const token = '6749756089:AAFMCjy0-85EkyQIrzC4tJU5jIyFJvpnLEI';
   const chatId = '-1002122565496';
@@ -30,9 +27,9 @@ const path = require('path');
     accessSecret: 'y9R2GZa8ZylPT3pR1BEL3ZYD9A5maVPhv7DIstD9AT2cf',
   });
 
-// Initialize product status
+// تعريف حالة المنتجات بناءً على الروابط المحددة
 const productStatus = {};
-urls.forEach(url => {
+urlsBot1.forEach(url => {
   productStatus[url] = {
     isAvailable: false,
     isNotifying: false,
