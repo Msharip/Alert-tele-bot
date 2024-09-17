@@ -1,3 +1,4 @@
+
 const axios = require('axios');
 const cheerio = require('cheerio');
 const TelegramBot = require('node-telegram-bot-api');
@@ -5,16 +6,19 @@ const cron = require('node-cron');
 const { TwitterApi } = require('twitter-api-v2');
 const path = require('path');
 
-// استيراد بيانات المنتجات من الملف الجديد
-const { productNames, urls, channels } = require('../products'); // التأكد من المسار الصحيح
+  const productNames = {
+    'https://www.dzrt.com/ar/highland-berries.html': { ar: 'هايلاند بيريز', en: 'highland-berries' },
+    'https://www.dzrt.com/ar/garden-mint.html': { ar: 'جاردن منت', en: 'garden-mint' },
+    'https://www.dzrt.com/ar/mint-fusion.html': { ar: 'منت فيوجن', en: 'mint-fusion' },
+    'https://www.dzrt.com/ar/dzrt-samra-special-edition.html': { ar: 'سمرة - أصدار خاص', en: 'samra-ed' }
+  };
 
-// تحديد الروابط التي تريد استخدامها في البوت الأول فقط
-const urlsBot1 = [
-  'https://www.dzrt.com/ar/highland-berries.html',
-  'https://www.dzrt.com/ar/garden-mint.html',
-  'https://www.dzrt.com/ar/mint-fusion.html',
-  'https://www.dzrt.com/ar/dzrt-samra-special-edition.html'
-];
+  const urls = [
+    'https://www.dzrt.com/ar/highland-berries.html',
+    'https://www.dzrt.com/ar/garden-mint.html',
+    'https://www.dzrt.com/ar/mint-fusion.html',
+    'https://www.dzrt.com/ar/dzrt-samra-special-edition.html'
+  ];
 
   const token = '6749756089:AAFMCjy0-85EkyQIrzC4tJU5jIyFJvpnLEI';
   const chatId = '-1002122565496';
@@ -27,9 +31,9 @@ const urlsBot1 = [
     accessSecret: 'y9R2GZa8ZylPT3pR1BEL3ZYD9A5maVPhv7DIstD9AT2cf',
   });
 
-// تعريف حالة المنتجات بناءً على الروابط المحددة
+// Initialize product status
 const productStatus = {};
-urlsBot1.forEach(url => {
+urls.forEach(url => {
   productStatus[url] = {
     isAvailable: false,
     isNotifying: false,
