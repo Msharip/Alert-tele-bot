@@ -7,16 +7,16 @@ const { TwitterApi } = require('twitter-api-v2');
 const path = require('path');
 
   const productNames = {
+    'https://www.dzrt.com/ar/icy-rush.html': { ar: 'آيسي رش', en: 'icy-rush' },
+    'https://www.dzrt.com/ar/seaside-frost.html': { ar: 'سي سايد', en: 'seaside-frost' },
     'https://www.dzrt.com/ar/highland-berries.html': { ar: 'هايلاند بيريز', en: 'highland-berries' },
-    'https://www.dzrt.com/ar/garden-mint.html': { ar: 'جاردن منت', en: 'garden-mint' },
-    'https://www.dzrt.com/ar/mint-fusion.html': { ar: 'منت فيوجن', en: 'mint-fusion' },
     'https://www.dzrt.com/ar/dzrt-samra-special-edition.html': { ar: 'سمرة - أصدار خاص', en: 'samra-ed' }
   };
 
   const urls = [
+    'https://www.dzrt.com/ar/icy-rush.html',
+    'https://www.dzrt.com/ar/seaside-frost.html',
     'https://www.dzrt.com/ar/highland-berries.html',
-    'https://www.dzrt.com/ar/garden-mint.html',
-    'https://www.dzrt.com/ar/mint-fusion.html',
     'https://www.dzrt.com/ar/dzrt-samra-special-edition.html'
   ];
 
@@ -54,6 +54,7 @@ async function checkProductAvailability(url) {
     if (productNames[url]) {
       const productNameAr = productNames[url].ar;
       const imageUrlAvailable = path.join(__dirname, '..', 'images', `${productNames[url].en}.png`);
+      const imageUrlUnAvailable = path.join(__dirname, '..', 'images', `${productNames[url].en}-outofstock.png`);
       const messageAvailable = `*${productNameAr}* - متوفر الآن ✅`;
 
       const replyMarkup = {
@@ -70,7 +71,6 @@ async function checkProductAvailability(url) {
 
       if (isAvailable && !productStatus[url].isAvailable && !productStatus[url].notificationLock) {
         // The product is now available
-        console.log(`${productNameAr} ✅ - المنتج متوفر الآن`);
 
         productStatus[url].isAvailable = true;
         productStatus[url].isOutOfStockNotified = false; // Reset out-of-stock notification
@@ -102,33 +102,39 @@ async function checkProductAvailability(url) {
       const timeAvailable = currentTime - productStatus[url].availableStartTime;
       const minutesAvailable = Math.floor(timeAvailable / 60000);
       const secondsAvailable = Math.floor((timeAvailable % 60000) / 1000);
-      const messageOutOfStock = `نفاذ المنتج *${productNameAr}* ❌ \n\nبقى متوفرا لمدة: ${minutesAvailable} دقائق و ${secondsAvailable} ثواني.`;
+      const messageOutOfStock = `نفذ المنتج *${productNameAr}* ❌\nبقى متوفرا لمدة: ${minutesAvailable} دقائق و ${secondsAvailable} ثواني.`;
 
-      if (!isAvailable && productStatus[url].isAvailable && !productStatus[url].isOutOfStockNotified) {
-        // The product is now out of stock
-        console.log(`${productNameAr} ❌ - المنتج نفذ من المخزون`);
 
-        productStatus[url].isAvailable = false;
-        productStatus[url].isOutOfStockNotified = true;
+// Inside the out-of-stock notification logic
+if (!isAvailable && productStatus[url].isAvailable && !productStatus[url].isOutOfStockNotified) {
+  // The product is now out of stock
+  console.log(`${productNameAr} ❌ - المنتج نفذ من المخزون`);
 
-        if (!productStatus[url].isNotifying) {
-          productStatus[url].isNotifying = true;
+  productStatus[url].isAvailable = false;
+  productStatus[url].isOutOfStockNotified = true;
 
-          // Delay out-of-stock notification for 3 minutes (180000 milliseconds)
-          setTimeout(async () => {
-            // Send out-of-stock notification to the channel
-            await bot.sendMessage(chatId, messageOutOfStock, { parse_mode: 'Markdown' });
+  if (!productStatus[url].isNotifying) {
+    productStatus[url].isNotifying = true;
 
-            productStatus[url].isNotifying = false;
-          }, 180000); // 3 minutes delay
-        }
+    // Delay out-of-stock notification for 3 minutes (180000 milliseconds)
+    setTimeout(async () => {
+      // Send out-of-stock notification with the image to the channel
+      await bot.sendPhoto(chatId, imageUrlUnAvailable, {
+        caption: messageOutOfStock,
+        parse_mode: 'Markdown'
+      });
 
-        // Lock notification for 90 seconds to prevent duplicate notifications
-        productStatus[url].notificationLock = true;
-        setTimeout(() => {
-          productStatus[url].notificationLock = false;
-        }, 90000); // 90 seconds
-      }
+      productStatus[url].isNotifying = false;
+    }, 180000); // 3 minutes delay
+  }
+
+  // Lock notification for 90 seconds to prevent duplicate notifications
+  productStatus[url].notificationLock = true;
+  setTimeout(() => {
+    productStatus[url].notificationLock = false;
+  }, 90000); // 90 seconds
+}
+
     }
   } catch (error) {
   }
