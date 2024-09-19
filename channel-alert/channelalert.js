@@ -11,7 +11,7 @@ require('dotenv').config();
 function delay(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
-/*
+
 const productNames = {
   'https://www.dzrt.com/ar/icy-rush.html': { ar: 'آيسي رش', en: 'icy-rush' },
   'https://www.dzrt.com/ar/seaside-frost.html': { ar: 'سي سايد', en: 'seaside-frost' },
@@ -80,6 +80,7 @@ bot.on('polling_error', (error) => {
   }
 });
 
+/*
 let lastLoginNotificationTime = {}; // كائن لتخزين وقت آخر إشعار لكل منتج
 let loginNotificationLock = {}; // كائن لتخزين قفل إشعارات السعر لكل منتج
 let previousPrices = {}; // كائن لتخزين الأسعار السابقة
