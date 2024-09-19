@@ -173,7 +173,11 @@ async function checkProductAvailability(url) {
   try {
     const { data } = await axios.get(url);
     const $ = cheerio.load(data);
-    const isAvailable = $('div.stock.available span').length > 0; // تحقق إذا كان المنتج متوفر
+    
+    // تحقق مما إذا كان العنصر الذي يحتوي على "OUT OF STOCK" موجودًا أو لا
+    const isOutOfStock = $('span:contains("OUT OF STOCK")').length > 0;
+    const isAvailable = !isOutOfStock; // إذا لم يكن المنتج "OUT OF STOCK"، فهو متاح
+
     const currentTime = Date.now();
 
     if (productNames[url]) {
@@ -253,7 +257,7 @@ async function checkProductAvailability(url) {
           clearTimeout(loginNotificationLock[url]); // إلغاء القفل القديم إذا كان موجودًا
         }
           loginNotificationLock[url] = setTimeout(() => {
-          loginNotificationLock[url] = false;
+          loginNotificationLock[url] = false; 
           console.log(`فك القفل السعر : ${productNameAr}`);           
         }, 18 * 60 * 1000); // 18 دقائق
       }
@@ -261,6 +265,7 @@ async function checkProductAvailability(url) {
   } catch (error) {
   }
 }
+
 
 
 async function checkAllUrls() {
