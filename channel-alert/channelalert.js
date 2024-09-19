@@ -80,7 +80,7 @@ bot.on('polling_error', (error) => {
   }
 });
 
-/*
+
 let lastLoginNotificationTime = {}; // كائن لتخزين وقت آخر إشعار لكل منتج
 let loginNotificationLock = {}; // كائن لتخزين قفل إشعارات السعر لكل منتج
 let previousPrices = {}; // كائن لتخزين الأسعار السابقة
@@ -99,7 +99,7 @@ const getPriceDetails = async (url) => {
     console.log(`Meta price: ${priceMeta}`);
     console.log(`Final price: ${priceInfo}`);
     console.log(`Gtag value: ${gtagValue}`);
-
+*/
     return {
       priceMeta,
       priceInfo,
@@ -307,7 +307,7 @@ cron.schedule('* * * * * *', () => {
     checkAllUrls();
   }
 });
-*/
+
 
 const dbConfig = {
   host: process.env.DB_HOST,
