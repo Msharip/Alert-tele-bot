@@ -11,6 +11,7 @@ require('dotenv').config();
 function delay(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
+/*
 const productNames = {
   'https://www.dzrt.com/ar/icy-rush.html': { ar: 'آيسي رش', en: 'icy-rush' },
   'https://www.dzrt.com/ar/seaside-frost.html': { ar: 'سي سايد', en: 'seaside-frost' },
@@ -97,7 +98,7 @@ const getPriceDetails = async (url) => {
     console.log(`Meta price: ${priceMeta}`);
     console.log(`Final price: ${priceInfo}`);
     console.log(`Gtag value: ${gtagValue}`);
-*/
+
     return {
       priceMeta,
       priceInfo,
@@ -305,7 +306,7 @@ cron.schedule('* * * * * *', () => {
     checkAllUrls();
   }
 });
-
+*/
 
 const dbConfig = {
   host: process.env.DB_HOST,
