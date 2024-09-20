@@ -7,17 +7,17 @@ const { TwitterApi } = require('twitter-api-v2');
 const path = require('path');
 
   const productNames = {
-    'https://www.dzrt.com/ar/icy-rush.html': { ar: 'آيسي رش', en: 'icy-rush' },
-    'https://www.dzrt.com/ar/seaside-frost.html': { ar: 'سي سايد', en: 'seaside-frost' },
-    'https://www.dzrt.com/ar/highland-berries.html': { ar: 'هايلاند بيريز', en: 'highland-berries' },
-    'https://www.dzrt.com/ar/dzrt-samra-special-edition.html': { ar: 'سمرة - أصدار خاص', en: 'samra-ed' }
+    'https://www.dzrt.com/ar-sa/products/icy-rush': { ar: 'آيسي رش', en: 'icy-rush' },
+    'https://www.dzrt.com/ar-sa/products/seaside-frost': { ar: 'سي سايد', en: 'seaside-frost' },
+    'https://www.dzrt.com/ar-sa/products/highland-berries': { ar: 'هايلاند بيريز', en: 'highland-berries' },
+    'https://www.dzrt.com/ar-sa/products/samra': { ar: 'سمرة - أصدار خاص', en: 'samra-ed' }
   };
 
   const urls = [
-    'https://www.dzrt.com/ar/icy-rush.html',
-    'https://www.dzrt.com/ar/seaside-frost.html',
-    'https://www.dzrt.com/ar/highland-berries.html',
-    'https://www.dzrt.com/ar/dzrt-samra-special-edition.html'
+    'https://www.dzrt.com/ar-sa/products/icy-rush',
+    'https://www.dzrt.com/ar-sa/products/seaside-frost',
+    'https://www.dzrt.com/ar-sa/products/highland-berries',
+    'https://www.dzrt.com/ar-sa/products/samra'
   ];
 
   const token = '6749756089:AAFMCjy0-85EkyQIrzC4tJU5jIyFJvpnLEI';
@@ -48,7 +48,8 @@ async function checkProductAvailability(url) {
   try {
     const { data } = await axios.get(url);
     const $ = cheerio.load(data);
-    const isAvailable = $('div.stock.available span').length > 0; // Check if product is available
+    const isOutOfStock = $('span:contains("OUT OF STOCK")').length > 0;
+    const isAvailable = !isOutOfStock; // إذا لم يكن المنتج "OUT OF STOCK"، فهو متاح
     const currentTime = Date.now();
 
     if (productNames[url]) {
