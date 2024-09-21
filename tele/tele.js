@@ -16,10 +16,10 @@ const twitterClient = new TwitterApi({
 });
 
 const productNames = {
- // 'purple-mist': { ar: 'بيربل مست', en: 'purple-mist' },
- // 'icy-rush': { ar: 'آيسي رش', en: 'icy-rush' },
- // 'seaside-frost': { ar: 'سي سايد', en: 'seaside-frost' },
- // 'highland-berries': { ar: 'هايلاند بيريز', en: 'highland-berries' },
+  'purple-mist': { ar: 'بيربل مست', en: 'purple-mist' },
+  'icy-rush': { ar: 'آيسي رش', en: 'icy-rush' },
+  'seaside-frost': { ar: 'سي سايد', en: 'seaside-frost' },
+  'highland-berries': { ar: 'هايلاند بيريز', en: 'highland-berries' },
   'mint-fusion': { ar: 'منت فيوجن', en: 'mint-fusion' },
 };
 
@@ -65,7 +65,7 @@ async function sendNotification(productUrl, productNameAr, imageUrlAvailableTele
             inline_keyboard: [
               [
                 { text: '📦 المنتجات', url: 'https://www.dzrt.com/ar-sa/products' },
-                { text: 'المنتـج 🛒 ', url: `https://www.dzrt.com/ar-sa/${productUrl}` }
+                { text: ' المنتـج 🟢', url: `https://www.dzrt.com${$(this).attr('href')}` }
               ],
               [
                 { text: 'تسجيل دخول 🔒', url: 'https://www.dzrt.com/ar/customer/account/login' }
