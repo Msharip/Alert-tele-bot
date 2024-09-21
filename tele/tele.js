@@ -1,160 +1,160 @@
-
 const axios = require('axios');
 const cheerio = require('cheerio');
 const TelegramBot = require('node-telegram-bot-api');
-const cron = require('node-cron');
-const { TwitterApi } = require('twitter-api-v2');
+const moment = require('moment-timezone');
+const cloudscraper = require('cloudscraper');
 const path = require('path');
+const { TwitterApi } = require('twitter-api-v2');
+require('dotenv').config();
 
-  const productNames = {
-    'https://www.dzrt.com/ar-sa/products/icy-rush': { ar: 'آيسي رش', en: 'icy-rush' },
-    'https://www.dzrt.com/ar-sa/products/seaside-frost': { ar: 'سي سايد', en: 'seaside-frost' },
-    'https://www.dzrt.com/ar-sa/products/highland-berries': { ar: 'هايلاند بيريز', en: 'highland-berries' },
-    'https://www.dzrt.com/ar-sa/products/samra': { ar: 'سمرة - أصدار خاص', en: 'samra-ed' }
-  };
+// بيانات Twitter API
+const twitterClient = new TwitterApi({
+  appKey: 'HrFfThKnzlbiuVXk2rBMfAndA',
+  appSecret: 'NCejLvJb5E8RFfXGGw6lqGH7yqXUhSvjZsZPBthAmFVhhAR095',
+  accessToken: '1791965388164440064-6p4RaldWOBEk4XLTlVaXrbT5C0JGVi',
+  accessSecret: 'y9R2GZa8ZylPT3pR1BEL3ZYD9A5maVPhv7DIstD9AT2cf',
+});
 
-  const urls = [
-    'https://www.dzrt.com/ar-sa/products/icy-rush',
-    'https://www.dzrt.com/ar-sa/products/seaside-frost',
-    'https://www.dzrt.com/ar-sa/products/highland-berries',
-    'https://www.dzrt.com/ar-sa/products/samra'
-  ];
+const productNames = {
+ // 'purple-mist': { ar: 'بيربل مست', en: 'purple-mist' },
+ // 'icy-rush': { ar: 'آيسي رش', en: 'icy-rush' },
+ // 'seaside-frost': { ar: 'سي سايد', en: 'seaside-frost' },
+ // 'highland-berries': { ar: 'هايلاند بيريز', en: 'highland-berries' },
+  'mint-fusion': { ar: 'منت فيوجن', en: 'mint-fusion' },
+};
 
-  const token = '6749756089:AAFMCjy0-85EkyQIrzC4tJU5jIyFJvpnLEI';
-  const chatId = '-1002122565496';
-  const bot = new TelegramBot(token);
-  
-  const twitterClient = new TwitterApi({
-    appKey: 'HrFfThKnzlbiuVXk2rBMfAndA',
-    appSecret: 'NCejLvJb5E8RFfXGGw6lqGH7yqXUhSvjZsZPBthAmFVhhAR095',
-    accessToken: '1791965388164440064-6p4RaldWOBEk4XLTlVaXrbT5C0JGVi',
-    accessSecret: 'y9R2GZa8ZylPT3pR1BEL3ZYD9A5maVPhv7DIstD9AT2cf',
-  });
+// قناة واحدة لجميع المنتجات
+const token = '6749756089:AAFMCjy0-85EkyQIrzC4tJU5jIyFJvpnLEI';
+const chatId = '-1002122565496'; // معرف قناة Telegram الموحدة
+const bot = new TelegramBot(token, { polling: false });
 
-// Initialize product status
 const productStatus = {};
-urls.forEach(url => {
-  productStatus[url] = {
+
+// تهيئة حالة كل منتج
+Object.keys(productNames).forEach(product => {
+  productStatus[product] = {
     isAvailable: false,
     isNotifying: false,
     isOutOfStockNotified: false,
     availableStartTime: null,
-    notificationLock: false,
+    notificationLock: false
   };
 });
 
-// Function to check product availability
-async function checkProductAvailability(url) {
+// دالة لإرسال إشعارات Telegram و Twitter
+async function sendNotification(productUrl, productNameAr, imageUrlAvailableTelegram, imageUrlAvailableTwitter, isAvailable, messageAvailable, messageOutOfStock) {
+  const currentTime = Date.now();
+
+  // إذا كان المنتج متوفر
+  if (isAvailable && !productStatus[productUrl].isAvailable && !productStatus[productUrl].notificationLock) {
+
+    productStatus[productUrl].isAvailable = true;
+    productStatus[productUrl].isOutOfStockNotified = false;
+    productStatus[productUrl].availableStartTime = currentTime;
+
+    if (!productStatus[productUrl].isNotifying) {
+      productStatus[productUrl].isNotifying = true;
+
+      // إضافة تأخير لمدة 3 دقائق (180000 مللي ثانية) قبل إرسال الإشعارات
+      setTimeout(async () => {
+        // إرسال إشعار إلى القناة الموحدة على Telegram مع صورة معينة
+        await bot.sendPhoto(chatId, imageUrlAvailableTelegram, {
+          caption: messageAvailable,
+          parse_mode: 'Markdown',
+          reply_markup: JSON.stringify({
+            inline_keyboard: [
+              [
+                { text: '📦 المنتجات', url: 'https://www.dzrt.com/ar-sa/products' },
+                { text: 'المنتـج 🛒 ', url: `https://www.dzrt.com/ar-sa/${productUrl}` }
+              ],
+              [
+                { text: 'تسجيل دخول 🔒', url: 'https://www.dzrt.com/ar/customer/account/login' }
+              ]
+            ]
+          })
+        });
+
+        // نشر تغريدة على تويتر مع صورة مختلفة
+        const tweetMessage = `${productNameAr} - 👀👀👀👀👀👇🏻! #دزرت #تنبيه \n\nhttps://www.dzrt.com/ar-sa/${productUrl}`;
+        const mediaId = await twitterClient.v1.uploadMedia(imageUrlAvailableTwitter); // تحميل الصورة إلى تويتر
+        await twitterClient.v2.tweet({ text: tweetMessage, media: { media_ids: [mediaId] } });
+
+        // إعادة ضبط الحالة
+        productStatus[productUrl].isNotifying = false;
+      }, 180000); // تأخير 3 دقائق لتليجرام
+    }
+  }
+
+  // إذا كان المنتج غير متوفر
+  if (!isAvailable && productStatus[productUrl].isAvailable && !productStatus[productUrl].isOutOfStockNotified) {
+ //   console.log(`${productNameAr} ❌ - المنتج نفذ من المخزون`);
+
+    productStatus[productUrl].isAvailable = false;
+    productStatus[productUrl].isOutOfStockNotified = true;
+
+    // حساب مدة التوفر
+    const timeAvailable = currentTime - productStatus[productUrl].availableStartTime;
+    const minutesAvailable = Math.floor(timeAvailable / 60000);
+    const secondsAvailable = Math.floor((timeAvailable % 60000) / 1000);
+
+    // تعديل الرسالة لتشمل مدة التوفر
+    const messageOutOfStockWithTime = `نفذ المنتج *${productNameAr}* ❌\nبقى متوفرا لمدة: ${minutesAvailable} دقائق و ${secondsAvailable} ثواني.`;
+
+    // مسار الصورة المخصصة لنفاد المنتج
+    const imageUrlUnAvailable = path.join(__dirname, '..', 'images', `${productNames[productUrl].en}-outofstock.png`); // تأكد من وجود الصورة بالمسمى الصحيح
+
+    // إرسال إشعار نفاد المنتج على Telegram مع صورة
+    await bot.sendPhoto(chatId, imageUrlUnAvailable, {
+      caption: messageOutOfStockWithTime,
+      parse_mode: 'Markdown',
+    });
+
+    // قفل إشعار التوفر لمدة دقيقة ونصف (90 ثانية)
+    productStatus[productUrl].notificationLock = true;
+    setTimeout(() => {
+      productStatus[productUrl].notificationLock = false;
+    }, 90000);
+  }
+}
+
+// دالة لفحص الصفحة الرئيسية
+async function checkHomePage() {
   try {
-    const { data } = await axios.get(url);
+    const url = 'https://www.dzrt.com/en-sa/products';
+    const data = await cloudscraper.get(url);
     const $ = cheerio.load(data);
-    const isOutOfStock = $('span:contains("OUT OF STOCK")').length > 0;
-    const isAvailable = !isOutOfStock; // إذا لم يكن المنتج "OUT OF STOCK"، فهو متاح
-    const currentTime = Date.now();
 
-    if (productNames[url]) {
-      const productNameAr = productNames[url].ar;
-      const imageUrlAvailable = path.join(__dirname, '..', 'images', `${productNames[url].en}.png`);
-      const imageUrlUnAvailable = path.join(__dirname, '..', 'images', `${productNames[url].en}-outofstock.png`);
-      const messageAvailable = `*${productNameAr}* - متوفر الآن ✅`;
+    $('a[href*="/products/"]').each(async function () {
+      const productUrl = $(this).attr('href').split('/products/')[1];
+      const isOutOfStock = $(this).find('span:contains("OUT OF STOCK")').length > 0;
+      const isAvailable = !isOutOfStock;
 
-      const replyMarkup = {
-        inline_keyboard: [
-          [
-            { text: ' المنتجات 📦', url: 'https://www.dzrt.com/ar/our-products.html' },
-            { text: 'إضافة للسلة 🛒', url: url }
-          ],
-          [
-            { text: 'تسجيل دخول 🔑', url: 'https://www.dzrt.com/ar/customer/account/login' }
-          ]
-        ]
-      };
+      if (productNames[productUrl]) {
+        const productNameAr = productNames[productUrl].ar;
 
-      if (isAvailable && !productStatus[url].isAvailable && !productStatus[url].notificationLock) {
-        // The product is now available
+        // مسارات الصور الخاصة بكل منصة
+        const imageUrlAvailableTelegram = path.join(__dirname, '..', 'images', `${productNames[productUrl].en}.png`); // صورة Telegram
+        const imageUrlAvailableTwitter = path.join(__dirname, '..', 'images', `${productNames[productUrl].en}-twitter.png`); // صورة Twitter
 
-        productStatus[url].isAvailable = true;
-        productStatus[url].isOutOfStockNotified = false; // Reset out-of-stock notification
-        productStatus[url].availableStartTime = currentTime;
+        const messageAvailable = `*${productNameAr}* - متوفر الآن ✅`;
+        const messageOutOfStock = `نفاذ المنتج *${productNameAr}* ❌`;
 
-        if (!productStatus[url].isNotifying) {
-          productStatus[url].isNotifying = true;
-
-          // Delay notification for 3 minutes (180000 milliseconds)
-          setTimeout(async () => {
-            // Send photo to the channel
-            await bot.sendPhoto(chatId, imageUrlAvailable, {
-              caption: messageAvailable,
-              parse_mode: 'Markdown',
-              reply_markup: JSON.stringify(replyMarkup)
-            });
-
-            // Tweet the availability
-            const tweetMessage = `${productNameAr} - متوفر الآن ✅! #دزرت #تنبيه \n${url}`;
-            const mediaId = await twitterClient.v1.uploadMedia(imageUrlAvailable); // Upload image to Twitter
-            await twitterClient.v2.tweet({ text: tweetMessage, media: { media_ids: [mediaId] } });
-
-            productStatus[url].isNotifying = false;
-          }, 180000); // 3 minutes delay
-        }
+        await sendNotification(productUrl, productNameAr, imageUrlAvailableTelegram, imageUrlAvailableTwitter, isAvailable, messageAvailable, messageOutOfStock);
       }
-
-      // Calculate time the product has been available
-      const timeAvailable = currentTime - productStatus[url].availableStartTime;
-      const minutesAvailable = Math.floor(timeAvailable / 60000);
-      const secondsAvailable = Math.floor((timeAvailable % 60000) / 1000);
-      const messageOutOfStock = `نفذ المنتج *${productNameAr}* ❌\nبقى متوفرا لمدة: ${minutesAvailable} دقائق و ${secondsAvailable} ثواني.`;
-
-
-// Inside the out-of-stock notification logic
-if (!isAvailable && productStatus[url].isAvailable && !productStatus[url].isOutOfStockNotified) {
-  // The product is now out of stock
-  console.log(`${productNameAr} ❌ - المنتج نفذ من المخزون`);
-
-  productStatus[url].isAvailable = false;
-  productStatus[url].isOutOfStockNotified = true;
-
-  if (!productStatus[url].isNotifying) {
-    productStatus[url].isNotifying = true;
-
-    // Delay out-of-stock notification for 3 minutes (180000 milliseconds)
-    setTimeout(async () => {
-      // Send out-of-stock notification with the image to the channel
-      await bot.sendPhoto(chatId, imageUrlUnAvailable, {
-        caption: messageOutOfStock,
-        parse_mode: 'Markdown'
-      });
-
-      productStatus[url].isNotifying = false;
-    }, 180000); // 3 minutes delay
-  }
-
-  // Lock notification for 90 seconds to prevent duplicate notifications
-  productStatus[url].notificationLock = true;
-  setTimeout(() => {
-    productStatus[url].notificationLock = false;
-  }, 90000); // 90 seconds
-}
-
-    }
+    });
   } catch (error) {
+    console.error(`حدث خطأ أثناء فحص الصفحة الرئيسية: ${error.message}`);
   }
 }
 
-// Function to check all URLs
-async function checkAllUrls() {
-  for (const url of urls) {
-    if (!productStatus[url].isNotifying) {
-      await checkProductAvailability(url);
-    }
-  }
+// دالة لجدولة الفحص كل دقيقتين
+function checkEveryTwoMinutes() {
+  checkHomePage();
+  const interval = 120000; // 120,000 مللي ثانية (2 دقائق)
+  setTimeout(checkEveryTwoMinutes, interval);
 }
 
-cron.schedule('* * * * *', () => {
-  const now = new Date();
-  const hour = now.getHours();
+// بدء الفحص كل دقيقتين
+checkEveryTwoMinutes();
 
-  if (hour >= 12 && hour <= 16) {
-    checkAllUrls();
-  }
-});
+
