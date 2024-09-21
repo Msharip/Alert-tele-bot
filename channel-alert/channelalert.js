@@ -20,7 +20,7 @@ const productNames = {
   'highland-berries': { ar: 'هايلاند بيريز', en: 'highland-berries' },
   'garden-mint': { ar: 'جاردن منت', en: 'garden-mint' },
   'mint-fusion': { ar: 'منت فيوجن', en: 'mint-fusion' },
-  'haila': { ar: 'هيلة', en: 'haila' },
+//  'haila': { ar: 'هيلة', en: 'haila' },
   'samra': { ar: 'سمرة', en: 'samra' },
   'edgy-mint': { ar: 'ايدجي منت', en: 'edgy-mint' },
   'tamra': { ar: 'تمرة', en: 'tamra' }
@@ -33,7 +33,7 @@ const channels = {
   'highland-berries': { chatId: process.env.CHAT_ID_HIGH },
   'garden-mint': { chatId: process.env.CHAT_ID_GARDEN },
   'mint-fusion': { chatId: process.env.CHAT_ID_MINT },
-  'haila': { chatId: process.env.CHAT_ID_HAILA },
+//  'haila': { chatId: process.env.CHAT_ID_HAILA },
   'samra': { chatId: process.env.CHAT_ID_SAMRA },
   'edgy-mint': { chatId: process.env.CHAT_ID_EDGY },
   'tamra': { chatId: process.env.CHAT_ID_TAMRA }
@@ -74,8 +74,10 @@ const getInventoryDetails = async (url) => {
   }
 };
 
-// دالة لفحص المنتجات
-const checkForInventoryChange = async (productUrls) => {
+// تعديل دالة checkForInventoryChange لفحص المنتجات المحددة فقط
+const checkForInventoryChange = async () => {
+  const productUrls = Object.keys(productNames).map(product => `https://www.dzrt.com/ar-sa/products/${product}`);
+
   for (const url of productUrls) {
     const inventoryQuantity = await getInventoryDetails(url);
     if (inventoryQuantity === null) continue;
@@ -134,7 +136,7 @@ async function checkHomePage() {
         if (isAvailable && inventoryQuantity > 0) {
           const messageAvailable = `
           *${productNameAr}* - متوفر الآن ✅
-          المخزون : ${inventoryQuantity}`;
+          الكمية المتاحة: ${inventoryQuantity}`;
           const replyMarkup = {
             inline_keyboard: [
               [
@@ -146,7 +148,7 @@ async function checkHomePage() {
                 { text: 'اعادة الطلب 🔁', url: 'https://www.dzrt.com/ar-sa/profile/orders' }
               ],
               [
-                { text: 'تسجيل دخول 🔒', url: 'https://www.dzrt.com/ar/customer/account/login' }
+                { text: 'تسجيل دخول 🔒', url: 'https://www.dzrt.com/ar-sa/login' }
               ]
             ]
           };
@@ -218,7 +220,7 @@ async function checkHomePage() {
 }
 
 function checkAllRandomly() {
-  console.log('Cheking product')
+  console.log('test')
   checkHomePage();
   const randomInterval = Math.floor(Math.random() * (10000 - 8000 + 1)) + 8000;
   setTimeout(checkAllRandomly, randomInterval);
@@ -243,6 +245,7 @@ bot.on('callback_query', async (query) => {
 
 
 console.log('bot is running')
+
 
 
 const dbConfig = {

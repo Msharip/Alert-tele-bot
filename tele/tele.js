@@ -68,14 +68,14 @@ async function sendNotification(productUrl, productNameAr, imageUrlAvailableTele
                 { text: ' المنتـج 🟢', url: `https://www.dzrt.com${$(this).attr('href')}` }
               ],
               [
-                { text: 'تسجيل دخول 🔒', url: 'https://www.dzrt.com/ar/customer/account/login' }
+                { text: 'تسجيل دخول 🔒', url: 'https://www.dzrt.com/ar-sa/login' }
               ]
             ]
           })
         });
 
         // نشر تغريدة على تويتر مع صورة مختلفة
-        const tweetMessage = `${productNameAr} - 👀👀👀👀👀👇🏻! #دزرت #تنبيه \n\nhttps://www.dzrt.com/ar-sa/${productUrl}`;
+        const tweetMessage = `${productNameAr} - 👀👀👀👀👀👇🏻! #دزرت #تنبيه \n\nhttps://www.dzrt.com/ar-sa/products${productUrl}`;
         const mediaId = await twitterClient.v1.uploadMedia(imageUrlAvailableTwitter); // تحميل الصورة إلى تويتر
         await twitterClient.v2.tweet({ text: tweetMessage, media: { media_ids: [mediaId] } });
 
