@@ -211,9 +211,10 @@ async function checkHomePage() {
     console.error(`حدث خطأ أثناء فحص الصفحة الرئيسية: ${error.message}`);
   }
 }
+
 function checkAllRandomly() {
   checkHomePage();
-  const randomInterval = Math.floor(Math.random() * (70000 - 30000 + 1)) + 3000000;
+  const randomInterval = Math.floor(Math.random() * (40000 - 20000 + 1)) + 20000;
   setTimeout(checkAllRandomly, randomInterval);
 }
 
