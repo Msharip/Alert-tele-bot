@@ -216,9 +216,9 @@ async function checkHomePage() {
 }
 
 function checkAllRandomly() {
-  console.log('Checking product')
+  console.log('Cheking product');
   checkHomePage();
-  const randomInterval = Math.floor(Math.random() * (7000 - 5000 + 1)) + 3000;
+  const randomInterval = Math.floor(Math.random() * (8000 - 6000 + 1)) + 6000;
   setTimeout(checkAllRandomly, randomInterval);
 }
 
