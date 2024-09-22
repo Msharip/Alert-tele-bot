@@ -146,7 +146,7 @@ async function checkHomePage() {
 
             // إرسال الإشعار للمستخدمين
             if (!productStatus[productUrl].isAvailable && !productStatus[productUrl].notificationLock) {
-              console.log(`${productNameAr} ✅ - المنتج متوفر الآن`);
+              console.log(`${productNameAr} ✅ - متوفر الآن`);
 
               productStatus[productUrl].isAvailable = true;
               productStatus[productUrl].isOutOfStockNotified = false;
