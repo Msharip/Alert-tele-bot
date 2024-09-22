@@ -80,7 +80,6 @@ const checkForInventoryChange = async (productUrls) => {
     const inventoryQuantity = await getInventoryDetails(url);
     if (inventoryQuantity === null) continue;
 
-    console.log(`URL : ${url} = ${inventoryQuantity}`);
 
     await delay(5000); // تأخير لمدة 5 ثواني
   }
@@ -216,9 +215,8 @@ async function checkHomePage() {
 }
 
 function checkAllRandomly() {
-  console.log('Cheking product')
   checkHomePage();
-  const randomInterval = Math.floor(Math.random() * (10000 - 8000 + 1)) + 6000;
+  const randomInterval = Math.floor(Math.random() * (10000 - 8000 + 1)) + 7000;
   setTimeout(checkAllRandomly, randomInterval);
 }
 
