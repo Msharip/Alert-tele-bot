@@ -60,7 +60,7 @@ const getInventoryDetails = async (url) => {
           const match = afterInventory.match(/:\s*(-?\d+)/);
           if (match) {
             inventoryQuantity = parseInt(match[1]);
-            console.log(`URL : ${url} = ${inventoryQuantity}`);
+   //         console.log(`URL : ${url} = ${inventoryQuantity}`);
 
             // هنا نقوم بتخزين الكمية باستخدام اسم المنتج
             const productName = url.split('/').pop(); // استخراج اسم المنتج
@@ -175,7 +175,7 @@ async function checkHomePage() {
             }
           }
         }
-        
+
         const imageUrlOutOfStock = path.join(__dirname, '..', 'images', `${productNames[productUrl].en}-outofstock.png`); // Path for out-of-stock image
         // تحقق إذا كان المنتج غير متوفر بعد أن كان متوفرًا
         const timeAvailable = currentTime - productStatus[productUrl].availableStartTime;
@@ -234,7 +234,6 @@ async function checkHomePage() {
 
 
 function checkAllRandomly() {
-  console.log("فحص")
   checkHomePage();
   const randomInterval = Math.floor(Math.random() * (15000 - 10000 + 1)) + 10000;
   setTimeout(checkAllRandomly, randomInterval);
