@@ -77,12 +77,18 @@ const getInventoryDetails = async (url) => {
 // دالة لفحص المنتجات
 const checkForInventoryChange = async (productUrls) => {
   for (const url of productUrls) {
+    console.log(`جاري فحص المنتج: ${url}`);
+    
     const inventoryQuantity = await getInventoryDetails(url);
-    if (inventoryQuantity === null) continue;
+    
+    if (inventoryQuantity === null) {
+      console.log(`فشل في جلب بيانات المنتج من: ${url}`);
+      continue;
+    }
 
-    console.log(`URL : ${url} = ${inventoryQuantity}`);
+    console.log(`المنتج: ${url} | الكمية المتوفرة: ${inventoryQuantity}`);
 
-    // إضافة تأخير لمدة 3 ثانية قبل الانتقال للمنتج التالي
+    // إضافة تأخير لمدة 3 ثوانٍ قبل الانتقال إلى المنتج التالي
     await delay(3000);
   }
 };
@@ -145,7 +151,7 @@ async function checkHomePage() {
                 { text: 'اعادة الطلب 🔁', url: 'https://www.dzrt.com/ar-sa/profile/orders' }
               ],
               [
-                { text: 'تسجيل دخول 🔒', url: 'https://www.dzrt.com/ar/customer/account/login' }
+                { text: 'تسجيل دخول 🔒', url: 'https://www.dzrt.com/ar-sa/login' }
               ]
             ]
           };
@@ -218,7 +224,7 @@ async function checkHomePage() {
 function checkAllRandomly() {
   console.log('Cheking product')
   checkHomePage();
-  const randomInterval = Math.floor(Math.random() * (10000 - 8000 + 1)) + 7000;
+  const randomInterval = Math.floor(Math.random() * (9000 - 3000 + 1)) + 3000;
   setTimeout(checkAllRandomly, randomInterval);
 }
 
