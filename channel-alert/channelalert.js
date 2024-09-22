@@ -23,7 +23,7 @@ const productNames = {
  // 'haila': { ar: 'هيلة', en: 'haila' },
   'samra': { ar: 'سمرة', en: 'samra' },
   'edgy-mint': { ar: 'ايدجي منت', en: 'edgy-mint' },
-  'tamra': { ar: 'تمرة', en: 'tamra' }
+  'tamra': { ar: 'تمرة', en: 'tamra' } 
 };
 
 const channels = {
@@ -216,9 +216,9 @@ async function checkHomePage() {
 }
 
 function checkAllRandomly() {
-  console.log('Cheking product')
+  console.log('Checking product')
   checkHomePage();
-  const randomInterval = Math.floor(Math.random() * (10000 - 8000 + 1)) + 8000;
+  const randomInterval = Math.floor(Math.random() * (10000 - 7000 + 1)) + 7000;
   setTimeout(checkAllRandomly, randomInterval);
 }
 
