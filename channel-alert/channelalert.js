@@ -69,7 +69,7 @@ const getInventoryDetails = async (url) => {
 
     return inventoryQuantity;
   } catch (error) {
-    console.error(`حدث خطأ أثناء جلب محتوى الصفحة من ${url}:`, error);
+ //   console.error(`حدث خطأ أثناء جلب محتوى الصفحة من ${url}:`, error);
     return null;
   }
 };
@@ -105,7 +105,8 @@ async function checkHomePage() {
       uri: url,
       headers: {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/85.0.4183.121 Safari/537.36'
-      }
+      },
+      timeout: 30000 // زيادة المهلة إلى 30 ثانية (30000 ميلي ثانية)
     };
     const data = await cloudscraper.get(options);
     const $ = cheerio.load(data);
@@ -210,15 +211,18 @@ async function checkHomePage() {
 
     await checkForInventoryChange(productUrls);
   } catch (error) {
-    console.error(`حدث خطأ أثناء فحص الصفحة الرئيسية: ${error.message}`);
+ //   console.error(`حدث خطأ أثناء فحص الصفحة الرئيسية: ${error.message}`);
   }
 }
 
 function checkAllRandomly() {
   checkHomePage();
-  const randomInterval = Math.floor(Math.random() * (10000 - 8000 + 1)) + 7000;
+  const randomInterval = Math.floor(Math.random() * (10000 - 8000 + 1)) + 8000;
   setTimeout(checkAllRandomly, randomInterval);
 }
+
+checkAllRandomly();
+
 
 checkAllRandomly();
 
