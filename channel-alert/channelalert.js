@@ -41,9 +41,7 @@ const channels = {
 const mainChannelId = process.env.CHAT_ID_MAIN;
 const token = process.env.TOKEN3;
 const bot = new TelegramBot(token, { polling: true });
-
-
-let previousInventory = {};
+let previousInventory = {}; // لتخزين كميات المنتجات
 
 // دالة لجلب تفاصيل `inventory_quantity` من صفحة المنتج
 const getInventoryDetails = async (url) => {
@@ -62,7 +60,11 @@ const getInventoryDetails = async (url) => {
           const match = afterInventory.match(/:\s*(-?\d+)/);
           if (match) {
             inventoryQuantity = parseInt(match[1]);
-  //          console.log(`URL : ${url} = ${inventoryQuantity}`);
+            console.log(`URL : ${url} = ${inventoryQuantity}`);
+
+            // هنا نقوم بتخزين الكمية باستخدام اسم المنتج
+            const productName = url.split('/').pop(); // استخراج اسم المنتج
+            previousInventory[productName] = inventoryQuantity; // تخزين الكمية في previousInventory
           }
         }
       }
@@ -70,17 +72,17 @@ const getInventoryDetails = async (url) => {
 
     return inventoryQuantity;
   } catch (error) {
-   // console.error(`حدث خطأ أثناء جلب محتوى الصفحة من ${url}:`, error);
+    console.error(`حدث خطأ أثناء جلب محتوى الصفحة من ${url}:`, error);
     return null;
   }
 };
+
 
 // دالة لفحص المنتجات
 const checkForInventoryChange = async (productUrls) => {
   for (const url of productUrls) {
     const inventoryQuantity = await getInventoryDetails(url);
     if (inventoryQuantity === null) continue;
-
 
     // إضافة تأخير لمدة ثانية واحدة قبل الانتقال للمنتج التالي
     await delay(2000);
@@ -127,7 +129,8 @@ async function checkHomePage() {
             const imageUrlAvailable = path.join(__dirname, '..', 'images', `${productNames[productUrl].en}.png`);
 
             const messageAvailable = `
-            *${productNameAr}* - متوفر الآن ✅`;
+            *${productNameAr}* - متوفر الآن ✅
+            المخزون : ${inventoryQuantity}`;
             const replyMarkup = {
               inline_keyboard: [
                 [
@@ -135,7 +138,7 @@ async function checkHomePage() {
                   { text: ' المنتـج 🟢', url: `https://www.dzrt.com${$(this).attr('href')}` }
                 ],
                 [
-                  { text: 'السلــــة 🛒', url: 'https://www.dzrt.com/ar-sa/cart' },
+                  { text: ' المخزون  📦', callback_data: `inventory_${productUrl}` },
                   { text: 'اعادة الطلب 🔁', url: 'https://www.dzrt.com/ar-sa/profile/orders' }
                 ],
                 [
@@ -146,7 +149,7 @@ async function checkHomePage() {
 
             // إرسال الإشعار للمستخدمين
             if (!productStatus[productUrl].isAvailable && !productStatus[productUrl].notificationLock) {
-              console.log(`${productNameAr} ✅ - متوفر الآن`);
+              console.log(`${productNameAr} ✅ - المنتج متوفر الآن`);
 
               productStatus[productUrl].isAvailable = true;
               productStatus[productUrl].isOutOfStockNotified = false;
@@ -172,57 +175,92 @@ async function checkHomePage() {
             }
           }
         }
+        
         const imageUrlOutOfStock = path.join(__dirname, '..', 'images', `${productNames[productUrl].en}-outofstock.png`); // Path for out-of-stock image
         // تحقق إذا كان المنتج غير متوفر بعد أن كان متوفرًا
         const timeAvailable = currentTime - productStatus[productUrl].availableStartTime;
-        const minutesAvailable = Math.floor(timeAvailable / 60000);
-        const secondsAvailable = Math.floor((timeAvailable % 60000) / 1000);
-        const messageOutOfStock = `نفذ المنتج *${productNameAr}* ❌\nبقى متوفرا لمدة: ${minutesAvailable} دقائق و ${secondsAvailable} ثواني.`;
-
+        const hoursAvailable = Math.floor(timeAvailable / (1000 * 60 * 60));
+        const minutesAvailable = Math.floor((timeAvailable % (1000 * 60 * 60)) / (1000 * 60));
+        const secondsAvailable = Math.floor((timeAvailable % (1000 * 60)) / 1000);
+        
+        // إنشاء رسالة بناءً على المدة المتوفرة
+        let messageOutOfStock = `نفذ المنتج *${productNameAr}* ❌\nبقى متوفرا لمدة: `;
+        
+        if (hoursAvailable > 0) {
+          messageOutOfStock += `${hoursAvailable} ساعات و ${minutesAvailable} دقائق و ${secondsAvailable} ثواني.`;
+        } else if (minutesAvailable > 0) {
+          messageOutOfStock += `${minutesAvailable} دقائق و ${secondsAvailable} ثواني.`;
+        } else {
+          messageOutOfStock += `${secondsAvailable} ثواني فقط.`;
+        }
+        
         if (!isAvailable && productStatus[productUrl].isAvailable && !productStatus[productUrl].isOutOfStockNotified) {
           console.log(`${productNameAr} ❌ - المنتج نفذ من المخزون`);
-
+        
+          // تحديث المخزون إلى 0 لأن المنتج نفد
+          previousInventory[productUrl] = 0;
+          console.log(`تم تحديث المخزون لمنتج ${productUrl} إلى 0 لأنه نفد.`);
+        
           productStatus[productUrl].isAvailable = false;
           productStatus[productUrl].isOutOfStockNotified = true;
-
+        
           if (!productStatus[productUrl].isNotifying) {
             productStatus[productUrl].isNotifying = true;
-
+        
             // إرسال الصورة مع رسالة النفاد
             await bot.sendPhoto(channels[productUrl].chatId, imageUrlOutOfStock, {
               caption: messageOutOfStock,
               parse_mode: 'Markdown'
             });
-
+        
             productStatus[productUrl].isNotifying = false;
           }
-
+        
           // قفل لإيقاف إرسال الإشعارات لمدة محددة
           productStatus[productUrl].notificationLock = true;
           setTimeout(() => {
             productStatus[productUrl].notificationLock = false;
-          }, 90000); // مدة القفل 90 ثانية
+          }, 60000); // مدة القفل 60 ثانية
         }
       }
     });
 
     await checkForInventoryChange(productUrls); // تفحص التغييرات في المخزون
   } catch (error) {
- //   console.error(`حدث خطأ أثناء فحص الصفحة الرئيسية: ${error.message}`);
+    console.error(`حدث خطأ أثناء فحص الصفحة الرئيسية: ${error.message}`);
   }
 }
 
+
+
 function checkAllRandomly() {
+  console.log("فحص")
   checkHomePage();
-  const randomInterval = Math.floor(Math.random() * (40000 - 20000 + 1)) + 20000;
+  const randomInterval = Math.floor(Math.random() * (15000 - 10000 + 1)) + 10000;
   setTimeout(checkAllRandomly, randomInterval);
 }
 
 checkAllRandomly();
 
+bot.on('callback_query', async (query) => {
+  const productName = query.data.split('_')[1]; // استخراج اسم المنتج
+
+  if (query.data.startsWith('inventory_')) {
+    const inventoryQuantity = previousInventory[productName]; // استرجاع الكمية باستخدام اسم المنتج
+
+    // إذا تم العثور على الكمية، عرضها في نافذة منبثقة
+    const popupMessage = `الكمية المتبقية: ${inventoryQuantity !== undefined ? inventoryQuantity : 'غير متوفرة'}`;
+
+    try {
+      await bot.answerCallbackQuery(query.id, { text: popupMessage, show_alert: true });
+    } catch (error) {
+      console.error(`فشل عرض النافذة المنبثقة: ${error.message}`);
+    }
+  }
+});
+
+
 console.log('bot is running')
-
-
 
 
 const dbConfig = {
