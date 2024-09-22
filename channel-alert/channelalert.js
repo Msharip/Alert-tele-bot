@@ -77,19 +77,13 @@ const getInventoryDetails = async (url) => {
 // دالة لفحص المنتجات
 const checkForInventoryChange = async (productUrls) => {
   for (const url of productUrls) {
-    console.log(`جاري فحص المنتج: ${url}`);
-    
     const inventoryQuantity = await getInventoryDetails(url);
-    
-    if (inventoryQuantity === null) {
-      console.log(`فشل في جلب بيانات المنتج من: ${url}`);
-      continue;
-    }
+    if (inventoryQuantity === null) continue;
 
-    console.log(`المنتج: ${url} | الكمية المتوفرة: ${inventoryQuantity}`);
+    console.log(`URL : ${url} = ${inventoryQuantity}`);
 
-    // إضافة تأخير لمدة 3 ثوانٍ قبل الانتقال إلى المنتج التالي
-    await delay(3000);
+    // إضافة تأخير لمدة ثانية واحدة قبل الانتقال للمنتج التالي
+    await delay(10000);
   }
 };
 
