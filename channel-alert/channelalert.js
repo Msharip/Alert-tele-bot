@@ -82,8 +82,8 @@ const checkForInventoryChange = async (productUrls) => {
 
     console.log(`URL : ${url} = ${inventoryQuantity}`);
 
-    // إضافة تأخير لمدة ثانية واحدة قبل الانتقال للمنتج التالي
-    await delay(2000);
+    // إضافة تأخير لمدة 3 ثانية قبل الانتقال للمنتج التالي
+    await delay(3000);
   }
 };
 
