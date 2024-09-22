@@ -99,8 +99,6 @@ Object.keys(productNames).forEach(product => {
     notificationLock: false
   };
 });
-
-// دالة لاستخراج الروابط من الصفحة الرئيسية وفحص المنتجات
 async function checkHomePage() {
   try {
     const url = 'https://www.dzrt.com/en-sa/products';
@@ -118,12 +116,13 @@ async function checkHomePage() {
 
     $('a[href*="/products/"]').each(async function () {
       const productUrl = $(this).attr('href').split('/products/')[1];
-      const isOutOfStock = $(this).find('span:contains("OUT OF STOCK")').length > 0;
-      const isAvailable = !isOutOfStock;
 
-      productUrls.push(`https://www.dzrt.com/ar-sa/products/${productUrl}`);
-
+      // التحقق إذا كان المنتج موجودًا في قائمة productNames
       if (productNames[productUrl]) {
+        const isOutOfStock = $(this).find('span:contains("OUT OF STOCK")').length > 0;
+        const isAvailable = !isOutOfStock;
+        productUrls.push(`https://www.dzrt.com/ar-sa/products/${productUrl}`);
+
         const productNameAr = productNames[productUrl].ar;
         const imageUrlAvailable = path.join(__dirname, '..', 'images', `${productNames[productUrl].en}.png`);
         const imageUrlOutOfStock = path.join(__dirname, '..', 'images', `${productNames[productUrl].en}-outofstock.png`);
@@ -150,7 +149,6 @@ async function checkHomePage() {
               ]
             ]
           };
-          
 
           if (!productStatus[productUrl].isAvailable && !productStatus[productUrl].notificationLock) {
             console.log(`${productNameAr} ✅ - المنتج متوفر الآن`);
@@ -185,22 +183,22 @@ async function checkHomePage() {
 
           if (!isAvailable && productStatus[productUrl].isAvailable && !productStatus[productUrl].isOutOfStockNotified) {
             console.log(`${productNameAr} ❌ - المنتج نفذ من المخزون`);
-          
+
             productStatus[productUrl].isAvailable = false;
             productStatus[productUrl].isOutOfStockNotified = true;
-          
+
             if (!productStatus[productUrl].isNotifying) {
               productStatus[productUrl].isNotifying = true;
-          
+
               // إرسال الصورة مع رسالة النفاد
               await bot.sendPhoto(channels[productUrl].chatId, imageUrlOutOfStock, {
                 caption: messageOutOfStock,
                 parse_mode: 'Markdown'
               });
-                    
+
               productStatus[productUrl].isNotifying = false;
             }
-          
+
             // قفل لإيقاف إرسال الإشعارات لمدة محددة
             productStatus[productUrl].notificationLock = true;
             setTimeout(() => {
