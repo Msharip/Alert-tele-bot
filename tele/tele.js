@@ -181,19 +181,10 @@ async function checkHomePage() {
   }
 }
 
-// دالة لجدولة الفحص كل دقيقتين
-async function checkEveryTwoMinutes() {
-  // جلب الكميات قبل فحص المنتجات
-  const productUrl = 'https://www.dzrt.com/ar-sa/products/icy-rush'; // رابط المنتج الذي تريد فحصه
-  await getInventoryDetails(productUrl);
-
-  // فحص المنتجات بعد فحص الكمية
-  await checkHomePage();
-
-  // جدولة الفحص كل دقيقتين
-  const interval = 120000; // 120,000 مللي ثانية (2 دقائق)
-  setTimeout(checkEveryTwoMinutes, interval);
+function checkAllRandomly() {
+  checkHomePage();
+  const randomInterval = Math.floor(Math.random() * (1000000 - 70000 + 1)) + 7000000;
+  setTimeout(checkAllRandomly, randomInterval);
 }
 
-// بدء الفحص كل دقيقتين
-checkEveryTwoMinutes();
+checkAllRandomly();

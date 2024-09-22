@@ -14,7 +14,7 @@ function delay(ms) {
 }
 
 const productNames = {
-  'purple-mist': { ar: 'بيربل مست', en: 'purple-mist' },
+  'Spicy Zest': { ar: 'بيربل مست', en: 'purple-mist' },
   'icy-rush': { ar: 'آيسي رش', en: 'icy-rush' },
   'seaside-frost': { ar: 'سي سايد', en: 'seaside-frost' },
   'highland-berries': { ar: 'هايلاند بيريز', en: 'highland-berries' },
@@ -23,7 +23,7 @@ const productNames = {
  // 'haila': { ar: 'هيلة', en: 'haila' },
   'samra': { ar: 'سمرة', en: 'samra' },
   'edgy-mint': { ar: 'ايدجي منت', en: 'edgy-mint' },
-  'tamra': { ar: 'تمرة', en: 'tamra' } 
+  'tamra': { ar: 'تمرة', en: 'tamra' }
 };
 
 const channels = {
@@ -62,6 +62,7 @@ const getInventoryDetails = async (url) => {
           const match = afterInventory.match(/:\s*(-?\d+)/);
           if (match) {
             inventoryQuantity = parseInt(match[1]);
+  //          console.log(`URL : ${url} = ${inventoryQuantity}`);
           }
         }
       }
@@ -69,7 +70,7 @@ const getInventoryDetails = async (url) => {
 
     return inventoryQuantity;
   } catch (error) {
- //   console.error(`حدث خطأ أثناء جلب محتوى الصفحة من ${url}:`, error);
+    console.error(`حدث خطأ أثناء جلب محتوى الصفحة من ${url}:`, error);
     return null;
   }
 };
@@ -81,10 +82,10 @@ const checkForInventoryChange = async (productUrls) => {
     if (inventoryQuantity === null) continue;
 
 
-    await delay(5000); // تأخير لمدة 5 ثواني
+    // إضافة تأخير لمدة ثانية واحدة قبل الانتقال للمنتج التالي
+    await delay(2000);
   }
 };
-
 
 // تخزين حالة المنتجات
 const productStatus = {};
@@ -101,14 +102,7 @@ Object.keys(productNames).forEach(product => {
 async function checkHomePage() {
   try {
     const url = 'https://www.dzrt.com/en-sa/products';
-    const options = {
-      uri: url,
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/85.0.4183.121 Safari/537.36'
-      },
-      timeout: 30000 // زيادة المهلة إلى 30 ثانية (30000 ميلي ثانية)
-    };
-    const data = await cloudscraper.get(options);
+    const data = await cloudscraper.get(url);
     const $ = cheerio.load(data);
     const currentTime = Date.now();
 
@@ -119,130 +113,115 @@ async function checkHomePage() {
 
       // التحقق إذا كان المنتج موجودًا في قائمة productNames
       if (productNames[productUrl]) {
+        const productNameAr = productNames[productUrl].ar; // هنا تعريف productNameAr بشكل صحيح
+
         const isOutOfStock = $(this).find('span:contains("OUT OF STOCK")').length > 0;
-        const isAvailable = !isOutOfStock;
-        productUrls.push(`https://www.dzrt.com/ar-sa/products/${productUrl}`);
+        const isAvailable = !isOutOfStock; // المنتج متوفر إذا لم يكن OUT OF STOCK
 
-        const productNameAr = productNames[productUrl].ar;
-        const imageUrlAvailable = path.join(__dirname, '..', 'images', `${productNames[productUrl].en}.png`);
-        const imageUrlOutOfStock = path.join(__dirname, '..', 'images', `${productNames[productUrl].en}-outofstock.png`);
-        const localTime = moment(currentTime).tz('Asia/Riyadh').format('YYYY-MM-DD HH:mm:ss');
+        // إذا كان المنتج متوفرًا، يتم التحقق من الكمية
+        if (isAvailable) {
+          const inventoryQuantity = await getInventoryDetails(`https://www.dzrt.com/ar-sa/products/${productUrl}`);
 
-        const inventoryQuantity = await getInventoryDetails(`https://www.dzrt.com/ar-sa/products/${productUrl}`);
+          // تحقق إذا كانت الكمية أكبر من 0
+          if (inventoryQuantity > 0) {
+            const imageUrlAvailable = path.join(__dirname, '..', 'images', `${productNames[productUrl].en}.png`);
 
-        if (isAvailable && inventoryQuantity > 0) {
-          const messageAvailable = `
-          *${productNameAr}* - متوفر الآن ✅
-          المخزون : ${inventoryQuantity}`;
-          const replyMarkup = {
-            inline_keyboard: [
-              [
-                { text: 'شراء سريع ⚡', url: 'https://www.dzrt.com/ar-sa/checkout' },
-                { text: ' المنتـج 🟢', url: `https://www.dzrt.com${$(this).attr('href')}` }
-              ],
-              [
-                { text: ' المخزون  📦', callback_data: `inventory_${productUrl}` },
-                { text: 'اعادة الطلب 🔁', url: 'https://www.dzrt.com/ar-sa/profile/orders' }
-              ],
-              [
-                { text: 'تسجيل دخول 🔒', url: 'https://www.dzrt.com/ar-sa/login' }
+            const messageAvailable = `
+            *${productNameAr}* - متوفر الآن ✅`;
+            const replyMarkup = {
+              inline_keyboard: [
+                [
+                  { text: 'شراء سريع ⚡', url: 'https://www.dzrt.com/ar-sa/checkout' },
+                  { text: ' المنتـج 🟢', url: `https://www.dzrt.com${$(this).attr('href')}` }
+                ],
+                [
+                  { text: 'السلــــة 🛒', url: 'https://www.dzrt.com/ar-sa/cart' },
+                  { text: 'اعادة الطلب 🔁', url: 'https://www.dzrt.com/ar-sa/profile/orders' }
+                ],
+                [
+                  { text: 'تسجيل دخول 🔒', url: 'https://www.dzrt.com/ar-sa/login' }
+                ]
               ]
-            ]
-          };
+            };
 
-          if (!productStatus[productUrl].isAvailable && !productStatus[productUrl].notificationLock) {
-            console.log(`${productNameAr} ✅ - المنتج متوفر الآن`);
+            // إرسال الإشعار للمستخدمين
+            if (!productStatus[productUrl].isAvailable && !productStatus[productUrl].notificationLock) {
+              console.log(`${productNameAr} ✅ - المنتج متوفر الآن`);
 
-            productStatus[productUrl].isAvailable = true;
-            productStatus[productUrl].isOutOfStockNotified = false;
-            productStatus[productUrl].availableStartTime = currentTime;
+              productStatus[productUrl].isAvailable = true;
+              productStatus[productUrl].isOutOfStockNotified = false;
+              productStatus[productUrl].availableStartTime = currentTime;
 
-            if (!productStatus[productUrl].isNotifying) {
-              productStatus[productUrl].isNotifying = true;
+              if (!productStatus[productUrl].isNotifying) {
+                productStatus[productUrl].isNotifying = true;
 
-              await bot.sendPhoto(channels[productUrl].chatId, imageUrlAvailable, {
-                caption: messageAvailable,
-                parse_mode: 'Markdown',
-                reply_markup: JSON.stringify(replyMarkup)
-              });
+                await bot.sendPhoto(channels[productUrl].chatId, imageUrlAvailable, {
+                  caption: messageAvailable,
+                  parse_mode: 'Markdown',
+                  reply_markup: JSON.stringify(replyMarkup)
+                });
 
-              await bot.sendPhoto(mainChannelId, imageUrlAvailable, {
-                caption: messageAvailable,
-                parse_mode: 'Markdown',
-                reply_markup: JSON.stringify(replyMarkup)
-              });
+                await bot.sendPhoto(mainChannelId, imageUrlAvailable, {
+                  caption: messageAvailable,
+                  parse_mode: 'Markdown',
+                  reply_markup: JSON.stringify(replyMarkup)
+                });
 
-              productStatus[productUrl].isNotifying = false;
+                productStatus[productUrl].isNotifying = false;
+              }
             }
           }
+        }
+        const imageUrlOutOfStock = path.join(__dirname, '..', 'images', `${productNames[productUrl].en}-outofstock.png`); // Path for out-of-stock image
+        // تحقق إذا كان المنتج غير متوفر بعد أن كان متوفرًا
+        const timeAvailable = currentTime - productStatus[productUrl].availableStartTime;
+        const minutesAvailable = Math.floor(timeAvailable / 60000);
+        const secondsAvailable = Math.floor((timeAvailable % 60000) / 1000);
+        const messageOutOfStock = `نفذ المنتج *${productNameAr}* ❌\nبقى متوفرا لمدة: ${minutesAvailable} دقائق و ${secondsAvailable} ثواني.`;
 
-          const timeAvailable = currentTime - productStatus[productUrl].availableStartTime;
-          const minutesAvailable = Math.floor(timeAvailable / 60000);
-          const secondsAvailable = Math.floor((timeAvailable % 60000) / 1000);
-          const messageOutOfStock = `نفذ المنتج *${productNameAr}* ❌\nبقى متوفرا لمدة: ${minutesAvailable} دقائق و ${secondsAvailable} ثواني.`;
+        if (!isAvailable && productStatus[productUrl].isAvailable && !productStatus[productUrl].isOutOfStockNotified) {
+          console.log(`${productNameAr} ❌ - المنتج نفذ من المخزون`);
 
-          if (!isAvailable && productStatus[productUrl].isAvailable && !productStatus[productUrl].isOutOfStockNotified) {
-            console.log(`${productNameAr} ❌ - المنتج نفذ من المخزون`);
+          productStatus[productUrl].isAvailable = false;
+          productStatus[productUrl].isOutOfStockNotified = true;
 
-            productStatus[productUrl].isAvailable = false;
-            productStatus[productUrl].isOutOfStockNotified = true;
+          if (!productStatus[productUrl].isNotifying) {
+            productStatus[productUrl].isNotifying = true;
 
-            if (!productStatus[productUrl].isNotifying) {
-              productStatus[productUrl].isNotifying = true;
+            // إرسال الصورة مع رسالة النفاد
+            await bot.sendPhoto(channels[productUrl].chatId, imageUrlOutOfStock, {
+              caption: messageOutOfStock,
+              parse_mode: 'Markdown'
+            });
 
-              // إرسال الصورة مع رسالة النفاد
-              await bot.sendPhoto(channels[productUrl].chatId, imageUrlOutOfStock, {
-                caption: messageOutOfStock,
-                parse_mode: 'Markdown'
-              });
-
-              productStatus[productUrl].isNotifying = false;
-            }
-
-            // قفل لإيقاف إرسال الإشعارات لمدة محددة
-            productStatus[productUrl].notificationLock = true;
-            setTimeout(() => {
-              productStatus[productUrl].notificationLock = false;
-            }, 90000); // مدة القفل 90 ثانية
+            productStatus[productUrl].isNotifying = false;
           }
+
+          // قفل لإيقاف إرسال الإشعارات لمدة محددة
+          productStatus[productUrl].notificationLock = true;
+          setTimeout(() => {
+            productStatus[productUrl].notificationLock = false;
+          }, 90000); // مدة القفل 90 ثانية
         }
       }
     });
 
-    await checkForInventoryChange(productUrls);
+    await checkForInventoryChange(productUrls); // تفحص التغييرات في المخزون
   } catch (error) {
- //   console.error(`حدث خطأ أثناء فحص الصفحة الرئيسية: ${error.message}`);
+    console.error(`حدث خطأ أثناء فحص الصفحة الرئيسية: ${error.message}`);
   }
 }
-
 function checkAllRandomly() {
   checkHomePage();
-  const randomInterval = Math.floor(Math.random() * (10000 - 8000 + 1)) + 8000;
+  const randomInterval = Math.floor(Math.random() * (70000 - 30000 + 1)) + 3000000;
   setTimeout(checkAllRandomly, randomInterval);
 }
 
 checkAllRandomly();
 
-
-checkAllRandomly();
-
-bot.on('callback_query', async (query) => {
-  const productUrl = query.data.split('_')[1];
-
-  if (query.data.startsWith('inventory_')) {
-    const inventoryQuantity = previousInventory[`https://www.dzrt.com/ar-sa/products/${productUrl}`];
-    const popupMessage = `الكمية المتبقية: ${inventoryQuantity !== undefined ? inventoryQuantity : 'غير متوفرة'}`;
-
-    try {
-      await bot.answerCallbackQuery(query.id, { text: popupMessage, show_alert: true });
-    } catch (error) {
-      console.error(`فشل عرض النافذة المنبثقة: ${error.message}`);
-    }
-  }
-});
-
-
 console.log('bot is running')
+
+
 
 
 const dbConfig = {
@@ -377,7 +356,7 @@ async function handleJoinRequests(request) {
         try {
           await approveJoinRequestWithDelay(channelId, userId);
         } catch (error) {
-  //        console.error(`Failed to approve join request for user ${userId} in channel ${channelId}:`, error);
+          console.error(`Failed to approve join request for user ${userId} in channel ${channelId}:`, error);
         }
       }
     } catch (err) {
