@@ -153,25 +153,24 @@ async function checkHomePage() {
     const url = 'https://www.dzrt.com/en-sa/products';
     const data = await cloudscraper.get(url);
     const $ = cheerio.load(data);
-
     $('a[href*="/products/"]').each(async function () {
       const productUrl = $(this).attr('href').split('/products/')[1];
       const isOutOfStock = $(this).find('span:contains("OUT OF STOCK")').length > 0;
-      const isAvailable = !isOutOfStock;
-
-      if (productNames[productUrl]) {
-        const productNameAr = productNames[productUrl].ar;
-
+      const isAvailable = !isOutOfStock; // المنتج متوفر إذا لم يكن OUT OF STOCK
+    
+      // إذا كان المنتج متوفرًا
+      if (isAvailable) {
         // جلب كمية المخزون للمنتج
         const inventoryQuantity = await getInventoryDetails(`https://www.dzrt.com/ar-sa/products/${productUrl}`);
-
-        // التحقق من المخزون وإرسال إشعار إذا كانت الكمية > 0
-        if (inventoryQuantity > 0 && isAvailable) {
+        
+        // تحقق إذا كانت الكمية أكبر من 0
+        if (inventoryQuantity > 0) {
+          const productNameAr = productNames[productUrl].ar;
           const imageUrlAvailableTelegram = path.join(__dirname, '..', 'images', `${productNames[productUrl].en}.png`); // صورة Telegram
           const imageUrlAvailableTwitter = path.join(__dirname, '..', 'images', `${productNames[productUrl].en}-twitter.png`); // صورة Twitter
           const messageAvailable = `*${productNameAr}* - متوفر الآن ✅ `;
           const messageOutOfStock = `نفاذ المنتج *${productNameAr}* ❌`;
-
+    
           await sendNotification(productUrl, productNameAr, imageUrlAvailableTelegram, imageUrlAvailableTwitter, isAvailable, messageAvailable, messageOutOfStock);
         }
       }
@@ -183,8 +182,9 @@ async function checkHomePage() {
 
 function checkAllRandomly() {
   checkHomePage();
-  const randomInterval = Math.floor(Math.random() * (1000000 - 70000 + 1)) + 7000000;
+  const randomInterval = Math.floor(Math.random() * (90000 - 60000 + 1)) + 60000;
   setTimeout(checkAllRandomly, randomInterval);
 }
+
 
 checkAllRandomly();
