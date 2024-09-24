@@ -6,7 +6,7 @@ const app = express();
 require('./channel-alert/channelalert.js'); 
 
 
-//require('./tele/tele.js');
+require('./tele/tele.js');
 
 
 // بدء الخادم لاستقبال طلبات Webhook

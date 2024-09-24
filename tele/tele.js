@@ -80,6 +80,7 @@ async function sendNotification(productUrl, productNameAr, imageUrlAvailableTele
 
   // إذا كان المنتج متوفر
   if (isAvailable && !productStatus[productUrl].isAvailable && !productStatus[productUrl].notificationLock) {
+    console.log(`${productNameAr} ✅ - المنتج متوفر الآن`);
 
     productStatus[productUrl].isAvailable = true;
     productStatus[productUrl].isOutOfStockNotified = false;
@@ -155,26 +156,29 @@ async function checkHomePage() {
     const $ = cheerio.load(data);
     $('a[href*="/products/"]').each(async function () {
       const productUrl = $(this).attr('href').split('/products/')[1];
-      const isOutOfStock = $(this).find('span:contains("OUT OF STOCK")').length > 0;
-      const isAvailable = !isOutOfStock; // المنتج متوفر إذا لم يكن OUT OF STOCK
+
+  // تحقق مما إذا كان المنتج موجودًا في productNames قبل المتابعة
+  if (productNames[productUrl]) {
+    const isOutOfStock = $(this).find('span:contains("OUT OF STOCK")').length > 0;
+    const isAvailable = !isOutOfStock; // المنتج متوفر إذا لم يكن OUT OF STOCK
     
-      // إذا كان المنتج متوفرًا
-      if (isAvailable) {
-        // جلب كمية المخزون للمنتج
-        const inventoryQuantity = await getInventoryDetails(`https://www.dzrt.com/ar-sa/products/${productUrl}`);
-        
-        // تحقق إذا كانت الكمية أكبر من 0
-        if (inventoryQuantity > 0) {
-          const productNameAr = productNames[productUrl].ar;
-          const imageUrlAvailableTelegram = path.join(__dirname, '..', 'images', `${productNames[productUrl].en}.png`); // صورة Telegram
-          const imageUrlAvailableTwitter = path.join(__dirname, '..', 'images', `${productNames[productUrl].en}-twitter.png`); // صورة Twitter
-          const messageAvailable = `*${productNameAr}* - متوفر الآن ✅ `;
-          const messageOutOfStock = `نفاذ المنتج *${productNameAr}* ❌`;
-    
-          await sendNotification(productUrl, productNameAr, imageUrlAvailableTelegram, imageUrlAvailableTwitter, isAvailable, messageAvailable, messageOutOfStock);
+    // إذا كان المنتج متوفرًا
+    if (isAvailable) {
+      // جلب كمية المخزون للمنتج
+      const inventoryQuantity = await getInventoryDetails(`https://www.dzrt.com/ar-sa/products/${productUrl}`);
+      
+      // تحقق إذا كانت الكمية أكبر من 0
+      if (inventoryQuantity > 32) {
+        const productNameAr = productNames[productUrl].ar;
+        const imageUrlAvailableTelegram = path.join(__dirname, '..', 'images', `${productNames[productUrl].en}.png`); // صورة Telegram
+        const imageUrlAvailableTwitter = path.join(__dirname, '..', 'images', `${productNames[productUrl].en}-twitter.png`); // صورة Twitter
+        const messageAvailable = `*${productNameAr}* - متوفر الآن ✅ `;
+        const messageOutOfStock = `نفاذ المنتج *${productNameAr}* ❌`;
+
+        await sendNotification(productUrl, productNameAr, imageUrlAvailableTelegram, imageUrlAvailableTwitter, isAvailable, messageAvailable, messageOutOfStock);
         }
       }
-    });
+  }});
   } catch (error) {
     console.error(`حدث خطأ أثناء فحص الصفحة الرئيسية: ${error.message}`);
   }
