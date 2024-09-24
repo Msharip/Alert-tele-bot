@@ -80,7 +80,6 @@ async function sendNotification(productUrl, productNameAr, imageUrlAvailableTele
 
   // إذا كان المنتج متوفر
   if (isAvailable && !productStatus[productUrl].isAvailable && !productStatus[productUrl].notificationLock) {
-    console.log(`${productNameAr} ✅ - المنتج متوفر الآن`);
 
     productStatus[productUrl].isAvailable = true;
     productStatus[productUrl].isOutOfStockNotified = false;
