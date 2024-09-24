@@ -6,9 +6,6 @@ const path = require('path');
 const { TwitterApi } = require('twitter-api-v2');
 require('dotenv').config();
 // دالة تأخير لتنفيذ الفاصل الزمني بين كل منتج
-function delay(ms) {
-  return new Promise(resolve => setTimeout(resolve, ms));
-}
 
 // بيانات Twitter API
 const twitterClient = new TwitterApi({
@@ -20,10 +17,9 @@ const twitterClient = new TwitterApi({
 
 const productNames = {
   'purple-mist': { ar: 'بيربل مست', en: 'purple-mist' },
-  'icy-rush': { ar: 'آيسي رش', en: 'icy-rush' },
-  'seaside-frost': { ar: 'سي سايد', en: 'seaside-frost' },
   'highland-berries': { ar: 'هايلاند بيريز', en: 'highland-berries' },
   'mint-fusion': { ar: 'منت فيوجن', en: 'mint-fusion' },
+  'tamra': { ar: 'تمرة', en: 'tamra' }
 };
 
 // قناة واحدة لجميع المنتجات
@@ -107,7 +103,7 @@ async function sendNotification(productUrl, productNameAr, imageUrlAvailableTele
         });
 
         // نشر تغريدة على تويتر مع صورة مختلفة
-        const tweetMessage = `${productNameAr} - 👀👀👀👀👀👇🏻! #دزرت #تنبيه \n\nhttps://www.dzrt.com/ar-sa/${productUrl}`;
+        const tweetMessage = `${productNameAr} - 👀👀👀👀👀👇🏻 #دزرت #تنبيه \n\nhttps://www.dzrt.com/ar-sa/${productUrl}`;
         const mediaId = await twitterClient.v1.uploadMedia(imageUrlAvailableTwitter); // تحميل الصورة إلى تويتر
         await twitterClient.v2.tweet({ text: tweetMessage, media: { media_ids: [mediaId] } });
 
@@ -167,7 +163,7 @@ async function checkHomePage() {
       const inventoryQuantity = await getInventoryDetails(`https://www.dzrt.com/ar-sa/products/${productUrl}`);
       
       // تحقق إذا كانت الكمية أكبر من 0
-      if (inventoryQuantity > 32) {
+      if (inventoryQuantity > 50) {
         const productNameAr = productNames[productUrl].ar;
         const imageUrlAvailableTelegram = path.join(__dirname, '..', 'images', `${productNames[productUrl].en}.png`); // صورة Telegram
         const imageUrlAvailableTwitter = path.join(__dirname, '..', 'images', `${productNames[productUrl].en}-twitter.png`); // صورة Twitter

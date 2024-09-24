@@ -125,7 +125,7 @@ async function checkHomePage() {
           const inventoryQuantity = await getInventoryDetails(`https://www.dzrt.com/ar-sa/products/${productUrl}`);
 
           // تحقق إذا كانت الكمية أكبر من 0
-          if (inventoryQuantity > 50) {
+          if (inventoryQuantity > 4) {
             const imageUrlAvailable = path.join(__dirname, '..', 'images', `${productNames[productUrl].en}.png`);
 
             const messageAvailable = `
