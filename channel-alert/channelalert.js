@@ -21,8 +21,8 @@ const productNames = {
   'garden-mint': { ar: 'جاردن منت', en: 'garden-mint' },
   'mint-fusion': { ar: 'منت فيوجن', en: 'mint-fusion' },
  // 'haila': { ar: 'هيلة', en: 'haila' },
-  'samra-special-edition': { ar: 'سمرة', en: 'samra-special-edition' },
-  'edgy-mint': { ar: 'ايدجي منت', en: 'edgy-mint' },
+ 'samra-special-edition': { ar: 'سمرة', en: 'samra-ed' },
+ 'edgy-mint': { ar: 'ايدجي منت', en: 'edgy-mint' },
   'tamra': { ar: 'تمرة', en: 'tamra' }
 };
 
