@@ -69,7 +69,7 @@ const getInventoryDetails = async (url) => {
     });
     return inventoryQuantity !== null ? inventoryQuantity : 0;
   } catch (error) {
-    console.error(`خطأ أثناء جلب تفاصيل المخزون: ${error.message}`);
+ //   console.error(`خطأ أثناء جلب تفاصيل المخزون: ${error.message}`);
     return 0;
   }
 };
@@ -179,7 +179,7 @@ async function checkHomePage() {
       }
   }});
   } catch (error) {
-    console.error(`حدث خطأ أثناء فحص الصفحة الرئيسية: ${error.message}`);
+  //  console.error(`حدث خطأ أثناء فحص الصفحة الرئيسية: ${error.message}`);
   }
 }
 

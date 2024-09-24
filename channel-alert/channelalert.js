@@ -72,7 +72,7 @@ const getInventoryDetails = async (url) => {
 
     return inventoryQuantity;
   } catch (error) {
-    console.error(`حدث خطأ أثناء جلب محتوى الصفحة من ${url}:`, error);
+ //   console.error(`حدث خطأ أثناء جلب محتوى الصفحة من ${url}:`, error);
     return null;
   }
 };
@@ -227,7 +227,7 @@ async function checkHomePage() {
 
     await checkForInventoryChange(productUrls); // تفحص التغييرات في المخزون
   } catch (error) {
-    console.error(`حدث خطأ أثناء فحص الصفحة الرئيسية: ${error.message}`);
+ //   console.error(`حدث خطأ أثناء فحص الصفحة الرئيسية: ${error.message}`);
   }
 }
 
