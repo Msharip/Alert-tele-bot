@@ -14,14 +14,14 @@ function delay(ms) {
 }
 
 const productNames = {
-  'Spicy Zest': { ar: 'بيربل مست', en: 'purple-mist' },
+  'purple-mist': { ar: 'بيربل مست', en: 'purple-mist' },
   'icy-rush': { ar: 'آيسي رش', en: 'icy-rush' },
   'seaside-frost': { ar: 'سي سايد', en: 'seaside-frost' },
   'highland-berries': { ar: 'هايلاند بيريز', en: 'highland-berries' },
   'garden-mint': { ar: 'جاردن منت', en: 'garden-mint' },
   'mint-fusion': { ar: 'منت فيوجن', en: 'mint-fusion' },
  // 'haila': { ar: 'هيلة', en: 'haila' },
- 'samra-special-edition': { ar: 'سمرة', en: 'samra-ed' },
+ 'samra': { ar: 'سمرة', en: 'samra' },
  'edgy-mint': { ar: 'ايدجي منت', en: 'edgy-mint' },
   'tamra': { ar: 'تمرة', en: 'tamra' }
 };
@@ -34,7 +34,7 @@ const channels = {
   'garden-mint': { chatId: process.env.CHAT_ID_GARDEN },
   'mint-fusion': { chatId: process.env.CHAT_ID_MINT },
  // 'haila': { chatId: process.env.CHAT_ID_HAILA },
-  'samra-special-edition': { chatId: process.env.CHAT_ID_SAMRA },
+  'samra': { chatId: process.env.CHAT_ID_SAMRA },
   'edgy-mint': { chatId: process.env.CHAT_ID_EDGY },
   'tamra': { chatId: process.env.CHAT_ID_TAMRA }
 };
@@ -328,7 +328,7 @@ async function unbanUserFromAllChannels(userId, channelIds) {
         await delay(DELAY_BETWEEN_REMOVALS); // تأخير 1 ثانية بين عمليات الإزالة
       } catch (error) {
         if (error.response && error.response.body && error.response.body.description === 'Bad Request: PARTICIPANT_ID_INVALID') {
-          console.log(`User ${userId} is not a participant in channel ${channelId}.`);
+ //         console.log(`User ${userId} is not a participant in channel ${channelId}.`);
         } else {
           console.error(`Failed to unban user ${userId} from channel ${channelId}:`, error);
         }
