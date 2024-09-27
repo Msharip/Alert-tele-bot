@@ -112,7 +112,7 @@ async function sendNotification(productUrl, productNameAr, imageUrlAvailableTele
 
         // إعادة ضبط الحالة
         productStatus[productUrl].isNotifying = false;
-      }, 0); // تأخير 3 دقائق لتليجرام
+    }, 180000); // تأخير 3 دقائق لتليجرام
 //    }, 180000); // تأخير 3 دقائق لتليجرام
 
     }

@@ -125,12 +125,15 @@ async function checkHomePage() {
           const inventoryQuantity = await getInventoryDetails(`https://www.dzrt.com/ar-sa/products/${productUrl}`);
 
           // تحقق إذا كانت الكمية أكبر من 0
-          if (inventoryQuantity > 3) {
+          if (inventoryQuantity > 0) {
             const imageUrlAvailable = path.join(__dirname, '..', 'images', `${productNames[productUrl].en}.png`);
 
             const messageAvailable = `
+            *${productNameAr}* - متوفر الآن ✅`;
+            /*
+            const messageAvailable = `
             *${productNameAr}* - متوفر الآن ✅
-            المخزون : ${inventoryQuantity}`;
+            المخزون : ${inventoryQuantity}`;*/
             const replyMarkup = {
               inline_keyboard: [
                 [
@@ -236,7 +239,7 @@ async function checkHomePage() {
 function checkAllRandomly() {
   checkHomePage();
  // const randomInterval = Math.floor(Math.random() * (15000 - 10000 + 1)) + 10000;
- const randomInterval = Math.floor(Math.random() * (4000 - 3000 + 1)) + 3000;
+ const randomInterval = Math.floor(Math.random() * (3000 - 2000 + 1)) + 2000;
   setTimeout(checkAllRandomly, randomInterval);
 }
 
