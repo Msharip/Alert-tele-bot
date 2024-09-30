@@ -141,7 +141,8 @@ async function checkHomePage() {
                   { text: ' المنتـج 🟢', url: `https://www.dzrt.com${$(this).attr('href')}` }
                 ],
                 [
-                  { text: ' المخزون  📦', callback_data: `inventory_${productUrl}` },
+          //        { text: ' المخزون  📦', callback_data: `inventory_${productUrl}` },
+                  { text: 'السلــــة 🛒', url: 'https://www.dzrt.com/ar-sa/cart' },
                   { text: 'اعادة الطلب 🔁', url: 'https://www.dzrt.com/ar-sa/profile/orders' }
                 ],
                 [

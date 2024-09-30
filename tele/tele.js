@@ -18,7 +18,7 @@ const twitterClient = new TwitterApi({
 const productNames = {
   'garden-mint': { ar: 'جاردن منت', en: 'garden-mint' },
   'mint-fusion': { ar: 'منت فيوجن', en: 'mint-fusion' },
- 'samra-special-edition': { ar: 'سمره - اصدار خاص', en: 'samra-special-edition' },
+  'samra-special-edition': { ar: 'سمره - اصدار خاص', en: 'samra-special-edition' },
 };
 
 // قناة واحدة لجميع المنتجات
@@ -102,7 +102,7 @@ async function sendNotification(productUrl, productNameAr, imageUrlAvailableTele
         });
 
         // نشر تغريدة على تويتر مع صورة مختلفة
-        const tweetMessage = `${productNameAr} - 👀👀👀👀👀👇🏻 #دزرت #تنبيه \n\nhttps://www.dzrt.com/ar-sa/${productUrl}`;
+        const tweetMessage = `${productNameAr} - 👀👀👀👀👀👇🏻 #دزرت #تنبيه \n\nhttps://www.dzrt.com/ar-sa/products/${productUrl}`;
         const mediaId = await twitterClient.v1.uploadMedia(imageUrlAvailableTwitter); // تحميل الصورة إلى تويتر
         await twitterClient.v2.tweet({ text: tweetMessage, media: { media_ids: [mediaId] } });
 
@@ -164,7 +164,7 @@ async function checkHomePage() {
       const inventoryQuantity = await getInventoryDetails(`https://www.dzrt.com/ar-sa/products/${productUrl}`);
       
       // تحقق إذا كانت الكمية أكبر من 0
-      if (inventoryQuantity > 50) {
+      if (inventoryQuantity > 0) {
         const productNameAr = productNames[productUrl].ar;
         const imageUrlAvailableTelegram = path.join(__dirname, '..', 'images', `${productNames[productUrl].en}.png`); // صورة Telegram
         const imageUrlAvailableTwitter = path.join(__dirname, '..', 'images', `${productNames[productUrl].en}-twitter.png`); // صورة Twitter
