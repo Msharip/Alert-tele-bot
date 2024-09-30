@@ -93,7 +93,7 @@ async function sendNotification(productUrl, productNameAr, imageUrlAvailableTele
             inline_keyboard: [
               [
                 { text: '📦 المنتجات', url: 'https://www.dzrt.com/ar-sa/products' },
-                { text: ' المنتـج 🟢', url: `https://www.dzrt.com/ar-sa/products${productUrl}` }              ],
+                { text: ' المنتـج 🟢', url: `https://www.dzrt.com/ar-sa/products/${productUrl}` }              ],
               [
                 { text: 'تسجيل دخول 🔒', url: 'https://www.dzrt.com/ar/customer/account/login' }
               ]
