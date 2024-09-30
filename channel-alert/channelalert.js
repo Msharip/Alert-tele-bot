@@ -21,7 +21,7 @@ const productNames = {
   'garden-mint': { ar: 'جاردن منت', en: 'garden-mint' },
   'mint-fusion': { ar: 'منت فيوجن', en: 'mint-fusion' },
  // 'haila': { ar: 'هيلة', en: 'haila' },
- 'samra': { ar: 'سمرة', en: 'samra' },
+ 'samra-special-edition': { ar: 'سمره - اصدار خاص', en: 'samra-special-edition' },
  'edgy-mint': { ar: 'ايدجي منت', en: 'edgy-mint' },
   'tamra': { ar: 'تمرة', en: 'tamra' }
 };
@@ -34,7 +34,7 @@ const channels = {
   'garden-mint': { chatId: process.env.CHAT_ID_GARDEN },
   'mint-fusion': { chatId: process.env.CHAT_ID_MINT },
  // 'haila': { chatId: process.env.CHAT_ID_HAILA },
-  'samra': { chatId: process.env.CHAT_ID_SAMRA },
+  'samra-special-edition': { chatId: process.env.CHAT_ID_SAMRA },
   'edgy-mint': { chatId: process.env.CHAT_ID_EDGY },
   'tamra': { chatId: process.env.CHAT_ID_TAMRA }
 };

@@ -16,13 +16,9 @@ const twitterClient = new TwitterApi({
 });
 
 const productNames = {
-/*  'purple-mist': { ar: 'بيربل مست', en: 'purple-mist' },
-  'highland-berries': { ar: 'هايلاند بيريز', en: 'highland-berries' },
+  'garden-mint': { ar: 'جاردن منت', en: 'garden-mint' },
   'mint-fusion': { ar: 'منت فيوجن', en: 'mint-fusion' },
-  'tamra': { ar: 'تمرة', en: 'tamra' }*/ 
-  'icy-rush': { ar: 'آيسي رش', en: 'icy-rush' },
-  'seaside-frost': { ar: 'سي سايد', en: 'seaside-frost' },
-
+ 'samra-special-edition': { ar: 'سمره - اصدار خاص', en: 'samra-special-edition' },
 };
 
 // قناة واحدة لجميع المنتجات
@@ -140,11 +136,11 @@ async function sendNotification(productUrl, productNameAr, imageUrlAvailableTele
       parse_mode: 'Markdown',
     });
 
-    // قفل إشعار التوفر لمدة دقيقة ونصف (90 ثانية)
+    // قفل إشعار التوفر لمدة (20 ثانية)
     productStatus[productUrl].notificationLock = true;
     setTimeout(() => {
       productStatus[productUrl].notificationLock = false;
-    }, 90000);
+    }, 20000);
   }
 }
 
