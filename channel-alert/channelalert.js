@@ -14,7 +14,7 @@ function delay(ms) {
 }
 
 const productNames = {
-  'purple-mist': { ar: 'بيربل مست', en: 'purple-mist' },
+ // 'purple-mist': { ar: 'بيربل مست', en: 'purple-mist' },
   'icy-rush': { ar: 'آيسي رش', en: 'icy-rush' },
   'seaside-frost': { ar: 'سي سايد', en: 'seaside-frost' },
   'highland-berries': { ar: 'هايلاند بيريز', en: 'highland-berries' },
@@ -27,7 +27,7 @@ const productNames = {
 };
 
 const channels = {
-  'purple-mist': { chatId: process.env.CHAT_ID_PURPLE },
+ // 'purple-mist': { chatId: process.env.CHAT_ID_PURPLE },
   'icy-rush': { chatId: process.env.CHAT_ID_ICY_RUSH },
   'seaside-frost': { chatId: process.env.CHAT_ID_SEASIDE },
   'highland-berries': { chatId: process.env.CHAT_ID_HIGH },
@@ -41,12 +41,19 @@ const channels = {
 const mainChannelId = process.env.CHAT_ID_MAIN;
 const token = process.env.TOKEN3;
 const bot = new TelegramBot(token, { polling: true });
-let previousInventory = {}; // لتخزين كميات المنتجات
+// let previousInventory = {}; // لتخزين كميات المنتجات
 
 // دالة لجلب تفاصيل `inventory_quantity` من صفحة المنتج
 const getInventoryDetails = async (url) => {
   try {
-    const pageContent = await cloudscraper.get(url);
+    const pageContent = await cloudscraper.get(url, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) ' +
+                      'AppleWebKit/537.36 (KHTML, like Gecko) ' +
+                      'Chrome/85.0.4183.102 Safari/537.36',
+        'Accept-Language': 'en-US,en;q=0.9',
+      }
+    });
     const $ = cheerio.load(pageContent);
     let inventoryQuantity = null;
 
@@ -63,8 +70,8 @@ const getInventoryDetails = async (url) => {
    //         console.log(`URL : ${url} = ${inventoryQuantity}`);
 
             // هنا نقوم بتخزين الكمية باستخدام اسم المنتج
-            const productName = url.split('/').pop(); // استخراج اسم المنتج
-            previousInventory[productName] = inventoryQuantity; // تخزين الكمية في previousInventory
+//            const productName = url.split('/').pop(); // استخراج اسم المنتج
+ //           previousInventory[productName] = inventoryQuantity; // تخزين الكمية في previousInventory
           }
         }
       }
@@ -142,7 +149,7 @@ async function checkHomePage() {
                 ],
                 [
           //        { text: ' المخزون  📦', callback_data: `inventory_${productUrl}` },
-                  { text: 'السلــــة 🛒', url: 'https://www.dzrt.com/ar-sa/cart' },
+                  { text: '📦 المنتجات', url: 'https://www.dzrt.com/ar-sa/products' },
                   { text: 'اعادة الطلب 🔁', url: 'https://www.dzrt.com/ar-sa/profile/orders' }
                 ],
                 [
@@ -202,7 +209,7 @@ async function checkHomePage() {
           console.log(`${productNameAr} ❌ - المنتج نفذ من المخزون`);
         
           // تحديث المخزون إلى 0 لأن المنتج نفد
-          previousInventory[productUrl] = 0;
+ //         previousInventory[productUrl] = 0;
           console.log(`تم تحديث المخزون لمنتج ${productUrl} إلى 0 لأنه نفد.`);
         
           productStatus[productUrl].isAvailable = false;
@@ -224,7 +231,7 @@ async function checkHomePage() {
           productStatus[productUrl].notificationLock = true;
           setTimeout(() => {
             productStatus[productUrl].notificationLock = false;
-          }, 20000); // مدة القفل 20 ثانية
+          }, 2000); // مدة القفل 2 ثانية
         }
       }
     });
@@ -245,23 +252,6 @@ function checkAllRandomly() {
 }
 
 checkAllRandomly();
-
-bot.on('callback_query', async (query) => {
-  const productName = query.data.split('_')[1]; // استخراج اسم المنتج
-
-  if (query.data.startsWith('inventory_')) {
-    const inventoryQuantity = previousInventory[productName]; // استرجاع الكمية باستخدام اسم المنتج
-
-    // إذا تم العثور على الكمية، عرضها في نافذة منبثقة
-    const popupMessage = `الكمية المتبقية: ${inventoryQuantity !== undefined ? inventoryQuantity : 'غير متوفرة'}`;
-
-    try {
-      await bot.answerCallbackQuery(query.id, { text: popupMessage, show_alert: true });
-    } catch (error) {
-      console.error(`فشل عرض النافذة المنبثقة: ${error.message}`);
-    }
-  }
-});
 
 
 console.log('bot is running')
