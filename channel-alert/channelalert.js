@@ -149,7 +149,7 @@ async function checkHomePage() {
                 ],
                 [
           //        { text: ' المخزون  📦', callback_data: `inventory_${productUrl}` },
-                  { text: '📦 المنتجات', url: 'https://www.dzrt.com/ar-sa/products' },
+                  { text: ' المنتجات 🛒', url: 'https://www.dzrt.com/ar-sa/products' },
                   { text: 'اعادة الطلب 🔁', url: 'https://www.dzrt.com/ar-sa/profile/orders' }
                 ],
                 [
@@ -231,7 +231,7 @@ async function checkHomePage() {
           productStatus[productUrl].notificationLock = true;
           setTimeout(() => {
             productStatus[productUrl].notificationLock = false;
-          }, 2000); // مدة القفل 2 ثانية
+          }, 5000); // مدة القفل 5 ثانية
         }
       }
     });
