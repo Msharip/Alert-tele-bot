@@ -17,26 +17,26 @@ const productNames = {
  // 'purple-mist': { ar: 'بيربل مست', en: 'purple-mist' },
   'icy-rush': { ar: 'آيسي رش', en: 'icy-rush' },
   'seaside-frost': { ar: 'سي سايد', en: 'seaside-frost' },
-  'highland-berries': { ar: 'هايلاند بيريز', en: 'highland-berries' },
+ // 'highland-berries': { ar: 'هايلاند بيريز', en: 'highland-berries' },
   'garden-mint': { ar: 'جاردن منت', en: 'garden-mint' },
-  'mint-fusion': { ar: 'منت فيوجن', en: 'mint-fusion' },
+//  'mint-fusion': { ar: 'منت فيوجن', en: 'mint-fusion' },
  // 'haila': { ar: 'هيلة', en: 'haila' },
- 'samra': { ar: 'سمره', en: 'samra' },
- 'edgy-mint': { ar: 'ايدجي منت', en: 'edgy-mint' },
-  'tamra': { ar: 'تمرة', en: 'tamra' }
+ //'samra': { ar: 'سمره', en: 'samra' },
+ //'edgy-mint': { ar: 'ايدجي منت', en: 'edgy-mint' },
+ // 'tamra': { ar: 'تمرة', en: 'tamra' }
 };
 
 const channels = {
  // 'purple-mist': { chatId: process.env.CHAT_ID_PURPLE },
   'icy-rush': { chatId: process.env.CHAT_ID_ICY_RUSH },
   'seaside-frost': { chatId: process.env.CHAT_ID_SEASIDE },
-  'highland-berries': { chatId: process.env.CHAT_ID_HIGH },
+ // 'highland-berries': { chatId: process.env.CHAT_ID_HIGH },
   'garden-mint': { chatId: process.env.CHAT_ID_GARDEN },
-  'mint-fusion': { chatId: process.env.CHAT_ID_MINT },
+ // 'mint-fusion': { chatId: process.env.CHAT_ID_MINT },
  // 'haila': { chatId: process.env.CHAT_ID_HAILA },
-  'samra': { chatId: process.env.CHAT_ID_SAMRA },
-  'edgy-mint': { chatId: process.env.CHAT_ID_EDGY },
-  'tamra': { chatId: process.env.CHAT_ID_TAMRA }
+ // 'samra': { chatId: process.env.CHAT_ID_SAMRA },
+  //'edgy-mint': { chatId: process.env.CHAT_ID_EDGY },
+ // 'tamra': { chatId: process.env.CHAT_ID_TAMRA }
 };
 const mainChannelId = process.env.CHAT_ID_MAIN;
 const token = process.env.TOKEN3;
@@ -231,7 +231,7 @@ async function checkHomePage() {
           productStatus[productUrl].notificationLock = true;
           setTimeout(() => {
             productStatus[productUrl].notificationLock = false;
-          }, 5000); // مدة القفل 5 ثانية
+          }, 15000); // مدة القفل 5 ثانية
         }
       }
     });
