@@ -69,7 +69,7 @@ const sendTelegramMessage = async (chatId, message, options = {}) => {
       parse_mode: options.parse_mode || 'Markdown',
       reply_markup: options.reply_markup || {}
     });
-    console.log('التنبيه المسبق للتلقرام تم ارسالة ✅');
+    console.log('تم إرسال رسالة إلى Telegram.');
   } catch (error) {
     console.error('حدث خطأ أثناء إرسال رسالة إلى Telegram:', error.response ? error.response.data : error.message);
   }
@@ -165,9 +165,9 @@ const getUpdatedAtDetails = async (url, datesToMonitor) => {
 
         // تفعيل القفل على إشعارات updated_at
         productStatus[productName].updatedAtLocked = true;
- //       console.log(`تم إرسال إشعار تحديث updated_at لمنتج ${productName} وتفعيل القفل.`);
+        console.log(`تم إرسال إشعار تحديث updated_at لمنتج ${productName} وتفعيل القفل.`);
       } else {
-    //    console.log(`تم تجاهل إشعار تحديث updated_at لمنتج ${productName} بسبب القفل أو التشغيل الأول.`);
+        console.log(`تم تجاهل إشعار تحديث updated_at لمنتج ${productName} بسبب القفل أو التشغيل الأول.`);
       }
 
       // تحديث القيمة المخزنة
@@ -335,7 +335,7 @@ async function checkHomePage() {
             setTimeout(() => {
               productStatus[productUrl].updatedAtLocked = false;
               console.log(`تم فتح القفل على إشعارات updated_at لمنتج ${productUrl} بعد 8 دقائق من إرسال إشعار النفاد.`);
-            }, 8 * 60 * 1000); // 8 دقائق
+            }, 5 * 60 * 1000); // 5 دقائق
 
             productStatus[productUrl].isNotifying = false;
           }
@@ -344,7 +344,7 @@ async function checkHomePage() {
           productStatus[productUrl].notificationLock = true;
           setTimeout(() => {
             productStatus[productUrl].notificationLock = false;
-          }, 5000); // مدة القفل 5 ثانية
+          }, 20000); // مدة القفل 20 ثانية
         }
       }
     });
@@ -374,7 +374,7 @@ const fetchAllUpdatedAt = async () => {
     // تنفيذ الطلبات مع تأخير عشوائي بين كل طلب
     for (const url of Object.keys(productNames)) {
       await getUpdatedAtDetails(`https://www.dzrt.com/en-sa/products/${url}`, datesToMonitor);
-      // إضافة تأخير عشوائي بين 1 إلى 2 ثوانٍ
+      // إضافة تأخير عشوائي بين 1 إلى 3 ثوانٍ
       const delayMs = Math.floor(Math.random() * 2000) + 1000; // من 1000 إلى 3000 مللي ثانية
       await delay(delayMs);
     }
@@ -565,7 +565,7 @@ bot.on('chat_join_request', (request) => {
   handleJoinRequests(request);
 });
 
-cron.schedule('30 0 * * *', () => {
+cron.schedule('28 0 * * *', () => {
   console.log("Running Sub Check");
   checkUserSubscriptions();
 });
