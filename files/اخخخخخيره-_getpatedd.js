@@ -130,7 +130,7 @@ const getUpdatedAtDetails = async (url, datesToMonitor) => {
 
     // التحقق من التغيير في `updated_at` للتاريخ المحدد
     if (previousUpdatedAt[productUrl][firstUpdatedDateISO] !== firstUpdatedAt) {
-      if (!isInitialRun && !productStatus[productUrl].updatedAtLocked) {
+      if (!isInitialRun && !productStatus[productUrl].updatedAtLocked) { // فقط إذا لم يكن التشغيل الأول ولا يوجد قفل
         // إرسال رسالة إلى Telegram عند اكتشاف تحديث جديد
         const message = `
 المنتج على وشك التوفر، سجل دخول
@@ -150,14 +150,18 @@ const getUpdatedAtDetails = async (url, datesToMonitor) => {
 
         // تفعيل القفل على إشعارات updated_at
         productStatus[productUrl].updatedAtLocked = true;
-
         console.log(`تم ارسال التنبيه المسبق ${productUrl} ✅`);
-    } else {
-         console.log(`تم تجاهل إشعار تحديث لمنتج ${productUrl}`);
-        }
+      } else {
+    //    console.log(`تم تجاهل إشعار تحديث updated_at لمنتج ${productUrl} بسبب القفل أو التشغيل الأول.`);
+      }
+
       // تحديث القيمة المخزنة
       previousUpdatedAt[productUrl][firstUpdatedDateISO] = firstUpdatedAt;
     }
+
+    // طباعة النتيجة المراقبة فقط
+  //  console.log(`\nمراقبة فقط أول Updated at للتاريخ (${firstUpdatedDateISO}):`);
+ //   console.log(`URL : ${url} - First Updated at: ${firstUpdatedAt}\n`);
 
   } catch (error) {
     console.error(`حدث خطأ أثناء جلب محتوى الصفحة من ${url}:`, error.response ? error.response.data : error.message);
@@ -188,6 +192,7 @@ const getInventoryDetails = async (url) => {
 
     return inventoryQuantity;
   } catch (error) {
+    //    console.error(`حدث خطأ أثناء جلب محتوى الصفحة من ${url}:`, error.response ? error.response.data : error.message);
     return null;
   }
 };
@@ -197,11 +202,6 @@ async function checkProductPages() {
   const currentTime = Date.now();
 
   for (const productUrl of Object.keys(productNames)) {
-    if (productStatus[productUrl].updatedAtLocked) {
-      // تجاهل التحقق من هذا المنتج مؤقتًا
-      continue;
-    }
-
     try {
       const pageContent = await cloudscraper.get(productUrl);
       const $ = cheerio.load(pageContent);
@@ -296,10 +296,11 @@ async function checkProductPages() {
               parse_mode: 'Markdown'
             });
 
-        // إعادة تعيين القفل بعد مدة محددة
-        setTimeout(() => {
-          productStatus[productUrl].updatedAtLocked = false;
-        }, 5 * 60 * 1000); // 5 دقائق
+            // فتح القفل على إشعارات updated_at بعد 5 دقائق
+            setTimeout(() => {
+              productStatus[productUrl].updatedAtLocked = false;
+              console.log(`تم فتح القفل على إشعارات updated_at لمنتج ${productUrl} بعد 5 دقائق من إرسال إشعار النفاد.`);
+            }, 5 * 60 * 1000); // 5 دقائق
 
             productStatus[productUrl].isNotifying = false;
           }
@@ -308,12 +309,12 @@ async function checkProductPages() {
           productStatus[productUrl].notificationLock = true;
           setTimeout(() => {
             productStatus[productUrl].notificationLock = false;
-          }, 3000); // مدة القفل 3 ثوانٍ
+          }, 3000); // مدة القفل 3 ثانية
         }
       }
 
       // إضافة تأخير قبل الانتقال للمنتج التالي
-      await delay(200); // تأخير بسيط بين المنتجات
+      await delay(2000);
 
     } catch (error) {
       console.error(`حدث خطأ أثناء فحص المنتج ${productUrl}:`, error.message);
@@ -322,47 +323,53 @@ async function checkProductPages() {
 }
 
 // دالة رئيسية لمعالجة جميع الروابط لمراقبة updated_at
-const monitorProducts = async () => {
+const fetchAllUpdatedAt = async () => {
   try {
     // تحديد تاريخ اليوم الحالي والتاريخ السابق بناءً على التاريخ المحلي
     const today = new Date();
     const todayISO = getLocalDateISO(today);
+    // console.log(`تاريخ اليوم الحالي: ${todayISO}`);
 
     const yesterdayDate = new Date(today);
     yesterdayDate.setDate(yesterdayDate.getDate() - 1);
     const yesterdayISO = getLocalDateISO(yesterdayDate);
+    // console.log(`تاريخ اليوم السابق: ${yesterdayISO}\n`);
 
     const datesToMonitor = [todayISO, yesterdayISO];
+    // console.log(`التواريخ التي سيتم مراقبتها: ${datesToMonitor.join(', ')}\n`);
 
     // تنفيذ الطلبات مع تأخير عشوائي بين كل طلب
     for (const productUrl of Object.keys(productNames)) {
       await getUpdatedAtDetails(productUrl, datesToMonitor);
-      // إضافة تأخير عشوائي بين 100 إلى 300 مللي ثانية
-      const delayMs = Math.floor(Math.random() * 100) + 100;
+      // إضافة تأخير عشوائي بين 1 إلى 2 ثوانٍ
+      const delayMs = Math.floor(Math.random() * 2000) + 1000; // من 1000 إلى 3000 مللي ثانية
       await delay(delayMs);
     }
-  //   console.log(previousUpdatedAt);
+
+    // console.log("كل قيم updated_at للتواريخ المراد مراقبتها تم جلبها:");
+    // console.log(previousUpdatedAt);
 
     if (isInitialRun) {
       // إذا كان التشغيل الأول، نعيّن isInitialRun إلى false بعد تحميل البيانات
       isInitialRun = false;
       console.log('تم تعيين isInitialRun إلى false.');
     }
-
-    // بعد الانتهاء من فحص updated_at، نقوم بفحص توفر المنتجات
-    await checkProductPages();
-   // console.log('Checking products');
-
   } catch (error) {
-    console.error("حدث خطأ أثناء مراقبة المنتجات:", error.response ? error.response.data : error.message);
-  } finally {
-    // نستخدم setTimeout لإعادة استدعاء الدالة بعد 1 ثانية
-    setTimeout(monitorProducts, 1000);
+    console.error("حدث خطأ أثناء جلب قيم updated_at لجميع المنتجات:", error.response ? error.response.data : error.message);
   }
 };
 
-// بدء المراقبة
-monitorProducts();
+// تشغيل المراقبة كل 1 ثانية (1000 مللي ثانية)
+setInterval(async () => {
+  await fetchAllUpdatedAt();
+  await delay(1000); // تأخير لمدة 1 ثانية
+  await checkProductPages();
+}, 1000);
+
+
+// تشغيل الدوال الأولية
+fetchAllUpdatedAt();
+checkProductPages();
 
 
 const dbConfig = {
