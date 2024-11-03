@@ -313,7 +313,7 @@ async function checkProductPages() {
       }
 
       // إضافة تأخير قبل الانتقال للمنتج التالي
-      await delay(200); // تأخير بسيط بين المنتجات
+      await delay(500); // تأخير بسيط بين المنتجات
 
     } catch (error) {
       console.error(`حدث خطأ أثناء فحص المنتج ${productUrl}:`, error.message);
@@ -338,7 +338,7 @@ const monitorProducts = async () => {
     for (const productUrl of Object.keys(productNames)) {
       await getUpdatedAtDetails(productUrl, datesToMonitor);
       // إضافة تأخير عشوائي بين 100 إلى 300 مللي ثانية
-      const delayMs = Math.floor(Math.random() * 100) + 100;
+      const delayMs = Math.floor(Math.random() * 1000) + 1000;
       await delay(delayMs);
     }
   //   console.log(previousUpdatedAt);
