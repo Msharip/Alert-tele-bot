@@ -400,14 +400,14 @@ async function checkUserSubscriptions() {
           process.env.CHAT_ID_MAIN,
           process.env.CHAT_ID_ICY_RUSH,
           process.env.CHAT_ID_SEASIDE,
-    //      process.env.CHAT_ID_SAMRA,
-    //      process.env.CHAT_ID_HIGH,
-    //      process.env.CHAT_ID_GARDEN,
-   //       process.env.CHAT_ID_MINT,
-  //        process.env.CHAT_ID_HAILA,
-  //        process.env.CHAT_ID_PURPPLE,
-  //        process.env.CHAT_ID_EDGY,
- //         process.env.CHAT_ID_TAMRA
+          process.env.CHAT_ID_SAMRA,
+          process.env.CHAT_ID_HIGH,
+          process.env.CHAT_ID_GARDEN,
+          process.env.CHAT_ID_MINT,
+          process.env.CHAT_ID_HAILA,
+          process.env.CHAT_ID_PURPPLE,
+          process.env.CHAT_ID_EDGY,
+          process.env.CHAT_ID_TAMRA
         ];
 
         try {
