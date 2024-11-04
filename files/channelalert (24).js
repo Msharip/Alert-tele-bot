@@ -396,19 +396,7 @@ async function checkUserSubscriptions() {
       const batch = usersToUnban.slice(i, i + BATCH_SIZE);
 
       await Promise.all(batch.map(async (user) => {
-        const channelIds = [
-          process.env.CHAT_ID_MAIN,
-          process.env.CHAT_ID_ICY_RUSH,
-          process.env.CHAT_ID_SEASIDE,
-    //      process.env.CHAT_ID_SAMRA,
-    //      process.env.CHAT_ID_HIGH,
-    //      process.env.CHAT_ID_GARDEN,
-   //       process.env.CHAT_ID_MINT,
-  //        process.env.CHAT_ID_HAILA,
-  //        process.env.CHAT_ID_PURPPLE,
-  //        process.env.CHAT_ID_EDGY,
- //         process.env.CHAT_ID_TAMRA
-        ];
+        const channelIds = Object.values(channels).map(channel => channel.chatId);
 
         try {
           await unbanUserFromAllChannels(user.id, channelIds);
@@ -417,7 +405,6 @@ async function checkUserSubscriptions() {
           console.error(`Failed to process user ${user.id}:`, error);
         }
       }));
-
 
       // إضافة تأخير بين الدفعات
       await delay(DELAY_BETWEEN_BATCHES);
