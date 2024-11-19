@@ -41,7 +41,8 @@ Object.keys(productNames).forEach(productUrl => {
     isOutOfStockNotified: false,
     availableStartTime: null,
     notificationLock: false,
-    updatedAtLocked: false // علم لقفل إشعارات updated_at
+    updatedAtLocked: false, // علم لقفل إشعارات updated_at
+    updatedAtLockTimer: null // معرف مؤقت القفل
   };
 });
 
@@ -205,58 +206,60 @@ async function checkProductPages() {
       const productNameAr = productNames[productUrl].ar;
       const productSlug = productNames[productUrl].en;
 
-      const isOutOfStock = $('span:contains("OUT OF STOCK")').length > 0;
-      const isAvailable = !isOutOfStock;
+      // الحصول على الكمية من دالة getInventoryDetails
+      const inventoryQuantity = await getInventoryDetails(productUrl);
+
+      // نعتبر المنتج متوفرًا إذا كانت الكمية أكبر من 0
+      const isAvailable = inventoryQuantity > 0;
 
       if (isAvailable) {
-        const inventoryQuantity = await getInventoryDetails(productUrl);
+        const imageUrlAvailable = path.join(__dirname, '..', 'images', `${productSlug}.png`);
 
-        if (inventoryQuantity > 0) {
-          const imageUrlAvailable = path.join(__dirname, '..', 'images', `${productSlug}.png`);
-
-          const messageAvailable = `
+        const messageAvailable = `
 *${productNameAr}* - متوفر الآن ✅
-          `;
-          const replyMarkup = {
-            inline_keyboard: [
-              [
-                { text: 'شراء سريع ⚡', url: 'https://www.dzrt.com/ar-sa/checkout' },
-                { text: 'المنتـج 🟢', url: productUrl.replace('/en-sa/', '/ar-sa/') }
-              ],
-              [
-                { text: ' المنتجات 🛒', url: 'https://www.dzrt.com/ar-sa/products' },
-                { text: 'اعادة الطلب 🔁', url: 'https://www.dzrt.com/ar-sa/profile/orders' }
-              ],
-              [
-                { text: 'تسجيل دخول 🔒', url: 'https://www.dzrt.com/ar-sa/login' }
-              ]
+        `;
+        const replyMarkup = {
+          inline_keyboard: [
+            [
+              { text: 'شراء سريع ⚡', url: 'https://www.dzrt.com/ar-sa/checkout' },
+              { text: 'المنتـج 🟢', url: productUrl.replace('/en-sa/', '/ar-sa/') }
+            ],
+            [
+              { text: ' المنتجات 🛒', url: 'https://www.dzrt.com/ar-sa/products' },
+              { text: 'اعادة الطلب 🔁', url: 'https://www.dzrt.com/ar-sa/profile/orders' }
+            ],
+            [
+              { text: 'تسجيل دخول 🔒', url: 'https://www.dzrt.com/ar-sa/login' }
             ]
-          };
+          ]
+        };
 
-          if (!productStatus[productUrl].isAvailable && !productStatus[productUrl].notificationLock) {
-            console.log(`${productNameAr} ✅ - المنتج متوفر الآن`);
+        if (!productStatus[productUrl].isAvailable && !productStatus[productUrl].notificationLock) {
+          console.log(`${productNameAr} ✅ - المنتج متوفر الآن`);
 
-            productStatus[productUrl].isAvailable = true;
-            productStatus[productUrl].isOutOfStockNotified = false;
-            productStatus[productUrl].availableStartTime = currentTime;
+          productStatus[productUrl].isAvailable = true;
+          productStatus[productUrl].isOutOfStockNotified = false;
+          productStatus[productUrl].availableStartTime = currentTime;
 
-            if (!productStatus[productUrl].isNotifying) {
-              productStatus[productUrl].isNotifying = true;
+          // فتح القفل على إشعارات updated_at عند توفر المنتج
+          productStatus[productUrl].updatedAtLocked = false;
 
-              await bot.sendPhoto(channels[productUrl].chatId, imageUrlAvailable, {
-                caption: messageAvailable,
-                parse_mode: 'Markdown',
-                reply_markup: JSON.stringify(replyMarkup)
-              });
+          if (!productStatus[productUrl].isNotifying) {
+            productStatus[productUrl].isNotifying = true;
 
-              await bot.sendPhoto(mainChannelId, imageUrlAvailable, {
-                caption: messageAvailable,
-                parse_mode: 'Markdown',
-                reply_markup: JSON.stringify(replyMarkup)
-              });
+            await bot.sendPhoto(channels[productUrl].chatId, imageUrlAvailable, {
+              caption: messageAvailable,
+              parse_mode: 'Markdown',
+              reply_markup: JSON.stringify(replyMarkup)
+            });
 
-              productStatus[productUrl].isNotifying = false;
-            }
+            await bot.sendPhoto(mainChannelId, imageUrlAvailable, {
+              caption: messageAvailable,
+              parse_mode: 'Markdown',
+              reply_markup: JSON.stringify(replyMarkup)
+            });
+
+            productStatus[productUrl].isNotifying = false;
           }
         }
       } else {
@@ -293,9 +296,17 @@ async function checkProductPages() {
               parse_mode: 'Markdown'
             });
 
-            // إعادة تعيين القفل بعد مدة محددة (5 دقائق بعد إرسال إشعار النفاد)
-            setTimeout(() => {
+            // قفل لإيقاف إرسال إشعارات updated_at لمدة محددة
+            // أولاً، قم بإلغاء المؤقت السابق إذا كان موجودًا
+            if (productStatus[productUrl].updatedAtLockTimer) {
+              clearTimeout(productStatus[productUrl].updatedAtLockTimer);
+            }
+
+            // قم بتعيين القفل وتخزين معرف المؤقت الجديد
+            productStatus[productUrl].updatedAtLocked = true;
+            productStatus[productUrl].updatedAtLockTimer = setTimeout(() => {
               productStatus[productUrl].updatedAtLocked = false;
+              productStatus[productUrl].updatedAtLockTimer = null; // إعادة تعيين معرف المؤقت
               console.log(`تم فتح القفل على إشعارات ${productUrl} بعد 5 دقائق من إرسال إشعار النفاد.`);
             }, 5 * 60 * 1000); // 5 دقائق
 
@@ -314,7 +325,7 @@ async function checkProductPages() {
       await delay(500); // تأخير بسيط بين المنتجات
 
     } catch (error) {
-    //  console.error(`حدث خطأ أثناء فحص المنتج ${productUrl}:`, error.message);
+      //  console.error(`حدث خطأ أثناء فحص المنتج ${productUrl}:`, error.message);
     }
   }
 }
