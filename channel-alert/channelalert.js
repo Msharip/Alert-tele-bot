@@ -169,6 +169,7 @@ const getUpdatedAtDetails = async (url, datesToMonitor) => {
   }
 };
 
+
 /*
 // دالة لجلب تفاصيل `inventory_quantity` من صفحة المنتج
 const getInventoryDetails = async (url) => {
@@ -328,7 +329,7 @@ const monitorProducts = async () => {
     const todayISO = getLocalDateISO(today);
 
     const yesterdayDate = new Date(today);
-    yesterdayDate.setDate(yesterdayDate.getDate() - 1);
+    yesterdayDate.setDate(yesterdayDate.getDate() - 2);
     const yesterdayISO = getLocalDateISO(yesterdayDate);
 
     const datesToMonitor = [todayISO, yesterdayISO];
