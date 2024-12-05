@@ -43,6 +43,7 @@ Object.keys(productNames).forEach(url => {
     updatedAtLocked: false // علم لقفل إشعارات updated_at
   };
 });
+/*
 
 // دالة لإرسال رسالة إلى Telegram مع خيارات إضافية
 const sendTelegramMessage = async (chatId, message, options = {}) => {
@@ -59,7 +60,6 @@ const sendTelegramMessage = async (chatId, message, options = {}) => {
     console.error('حدث خطأ أثناء إرسال رسالة إلى Telegram:', error.response ? error.response.data : error.message);
   }
 };
-
 // دالة للحصول على التاريخ المحلي بصيغة YYYY-MM-DD
 const getLocalDateISO = (date = new Date()) => {
   const year = date.getFullYear();
@@ -159,7 +159,7 @@ const getUpdatedAtDetails = async (url, datesToMonitor) => {
     console.error(`حدث خطأ أثناء جلب محتوى الصفحة من ${url}:`, error.response ? error.response.data : error.message);
   }
 };
-
+*/
 // دالة لفحص توفر المنتجات
 const checkProductAvailability = async () => {
   const currentTime = Date.now();
@@ -285,7 +285,7 @@ const checkProductAvailability = async () => {
     console.log('تم الانتهاء من التشغيل الأول.');
   }
 };
-
+/*
 // دالة رئيسية لمعالجة جميع الروابط لمراقبة updated_at
 const fetchAllUpdatedAt = async () => {
   try {
@@ -316,15 +316,15 @@ const fetchAllUpdatedAt = async () => {
     console.error("حدث خطأ أثناء جلب قيم updated_at لجميع المنتجات:", error.response ? error.response.data : error.message);
   }
 };
-
+*/
 // تشغيل المراقبة كل 1 ثانية
 setInterval(() => {
-  fetchAllUpdatedAt();
+//  fetchAllUpdatedAt();
   checkProductAvailability();
 }, 1000);
 
 // تشغيل الدالة الأولى فورًا عند بدء السكربت
-fetchAllUpdatedAt();
+//fetchAllUpdatedAt();
 checkProductAvailability();
 
 
