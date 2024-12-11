@@ -21,30 +21,13 @@ function delay(ms) {
 const productNames = {
   'https://www.dzrt.com/en-sa/products/icy-rush': { ar: 'آيسي رش', en: 'icy-rush' },
   'https://www.dzrt.com/en-sa/products/seaside-frost': { ar: 'سي سايد', en: 'seaside-frost' },
-  'https://www.dzrt.com/en-sa/products/garden-mint': { ar: 'جاردن منت', en: 'garden-mint' },
-  'https://www.dzrt.com/en-sa/products/mint-fusion': { ar: 'منت فيوجن', en: 'mint-fusion' },
-  'https://www.dzrt.com/en-sa/products/edgy-mint': { ar: 'ايدجي منت', en: 'edgy-mint' },
-
-  'https://www.dzrt.com/en-sa/products/hamidh': { ar: 'حامض', en: 'Hamidh' },
-  'https://www.dzrt.com/en-sa/products/unqood': { ar: ' عنقود', en: 'Unqood' },
-  'https://www.dzrt.com/en-sa/products/manga': { ar: ' منقا', en: 'Manga' },
-  'https://www.dzrt.com/en-sa/products/bonna': { ar: 'بنه ', en: 'Bonna' },
-
-
+  // يمكنك إضافة منتجات أخرى هنا...
 };
 
 const channels = {
   'https://www.dzrt.com/en-sa/products/icy-rush': { chatId: process.env.CHAT_ID_ICY_RUSH },
   'https://www.dzrt.com/en-sa/products/seaside-frost': { chatId: process.env.CHAT_ID_SEASIDE },
-  'https://www.dzrt.com/en-sa/products/garden-mint': { chatId: process.env.CHAT_ID_GARDEN },
-  'https://www.dzrt.com/en-sa/products/mint-fusion': { chatId: process.env.CHAT_ID_MINT },
-  'https://www.dzrt.com/en-sa/products/edgy-mint': {chatId: process.env.CHAT_ID_EDGY },
-  
-  'https://www.dzrt.com/en-sa/products/hamidh': {chatId: process.env.CHAT_ID_HAILA },
-  'https://www.dzrt.com/en-sa/products/unqood': {chatId: process.env.CHAT_ID_PURPLE },
-  'https://www.dzrt.com/en-sa/products/manga': {chatId: process.env.CHAT_ID_TAMRA },
-  'https://www.dzrt.com/en-sa/products/bonna': {chatId: process.env.CHAT_ID_SAMRA },
-
+  // تأكد من إضافة chatId لكل منتج
 };
 
 const mainChannelId = process.env.CHAT_ID_MAIN;
