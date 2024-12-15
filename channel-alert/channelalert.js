@@ -364,7 +364,7 @@ async function unbanUserFromAllChannels(userId, channelIds) {
         await bot.unbanChatMember(channelId, userId);
         await delay(DELAY_BETWEEN_REMOVALS);
       } catch (error) {
-        if (error.response && error.response.body && error.response.body.description === 'Bad Request: USER_ID_INVALID') {
+        if (error.response && error.response.body && error.response.body.description === 'Bad Request: PARTICIPANT_ID_INVALID') {
  //         console.log(`User ${userId} is not a participant in channel ${channelId}.`);
         } else {
           console.error(`Failed to unban user ${userId} from channel ${channelId}:`, error);
