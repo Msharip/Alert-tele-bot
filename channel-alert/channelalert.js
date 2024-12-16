@@ -4,46 +4,13 @@ const TelegramBot = require('node-telegram-bot-api');
 const cron = require('node-cron');
 const path = require('path');
 const mysql = require('mysql2/promise');
-const cloudscraper = require('cloudscraper');  // تأكد من تثبيت المكتبة عبر npm
+const cloudscraper = require('cloudscraper');
 require('dotenv').config();
 
 // دالة تأخير لتنفيذ الفاصل الزمني بين كل منتج
 function delay(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
-
-// دالة تأخير لتنفيذ الفاصل الزمني بين كل منتج
-function delay(ms) {
-  return new Promise(resolve => setTimeout(resolve, ms));
-}
-
-// دالة لجلب تفاصيل inventory_quantity من صفحة المنتج "آيسي رش"
-const getInventoryDetails = async (url) => {
-  try {
-    const pageContent = await cloudscraper.get(url);
-    const $ = cheerio.load(pageContent);
-    let inventoryQuantity = null;
-
-    $('script').each((i, script) => {
-      const scriptContent = $(script).html();
-
-      if (scriptContent.includes('inventory_quantity')) {
-        const parts = scriptContent.split('inventory_quantity');
-        if (parts.length > 1) {
-          const afterInventory = parts[1];
-          const match = afterInventory.match(/:\s*(-?\d+)/);
-          if (match) {
-            inventoryQuantity = parseInt(match[1]);
-          }
-        }
-      }
-    });
-
-    return inventoryQuantity;
-  } catch (error) {
-    return null;
-  }
-};
 
 // تعريف المنتجات
 const productNames = {
@@ -52,9 +19,9 @@ const productNames = {
   'https://www.dzrt.com/en-sa/products/garden-mint': { ar: 'جاردن منت', en: 'garden-mint' },
   'https://www.dzrt.com/en-sa/products/mint-fusion': { ar: 'منت فيوجن', en: 'mint-fusion' },
   'https://www.dzrt.com/en-sa/products/hamidh': { ar: 'حامض', en: 'Hamidh' },
-  'https://www.dzrt.com/en-sa/products/unqood': { ar: ' عنقود', en: 'Unqood' },
-  'https://www.dzrt.com/en-sa/products/manga': { ar: ' منقا', en: 'Manga' },
-  'https://www.dzrt.com/en-sa/products/bonna': { ar: 'بنه ', en: 'Bonna' },
+  'https://www.dzrt.com/en-sa/products/unqood': { ar: 'عنقود', en: 'Unqood' },
+  'https://www.dzrt.com/en-sa/products/manga': { ar: 'منقا', en: 'Manga' },
+  'https://www.dzrt.com/en-sa/products/bonna': { ar: 'بنه', en: 'Bonna' },
 };
 
 const channels = {
@@ -91,26 +58,19 @@ const checkProductPages = async () => {
 
   for (const [url, productInfo] of Object.entries(productNames)) {
     try {
-      let isAvailable = false;
+      const pageContent = await cloudscraper.get(url);
+      const $ = cheerio.load(pageContent);
 
-      // في حالة آيسي رش نستخدم inventory_quantity
-      if (productInfo.en === 'icy-rush') {
-        const inventoryQuantity = await getInventoryDetails(url);
-        isAvailable = inventoryQuantity !== null && inventoryQuantity > 0;
-      } else {
-        // لباقي المنتجات، نتحقق من عدم وجود عبارة "OUT OF STOCK"
-        const pageContent = await cloudscraper.get(url);
-        const $ = cheerio.load(pageContent);
-        const isOutOfStock = $('span:contains("OUT OF STOCK")').length > 0;
-        isAvailable = !isOutOfStock;
-      }
+      // التحقق من عبارة OUT OF STOCK
+      const isOutOfStock = $('span:contains("OUT OF STOCK")').length > 0;
+      const isAvailable = !isOutOfStock;
 
       if (isAvailable) {
         const imageUrlAvailable = path.join(__dirname, '..', 'images', `${productInfo.en}.png`);
+
         const messageAvailable = `
 *${productInfo.ar}* - متوفر الآن ✅
         `;
-
         const replyMarkup = {
           inline_keyboard: [
             [
@@ -127,7 +87,7 @@ const checkProductPages = async () => {
           ]
         };
 
-        // إرسال الإشعار للمستخدمين
+        // إرسال الإشعار للمستخدمين إذا كان المنتج متوفر لأول مرة بعد النفاد
         if (!productStatus[url].isAvailable && !productStatus[url].notificationLock) {
           console.log(`${productInfo.ar} ✅ - المنتج متوفر الآن`);
 
@@ -220,6 +180,7 @@ const monitorAvailability = async () => {
 };
 
 monitorAvailability();
+
 
 
 
