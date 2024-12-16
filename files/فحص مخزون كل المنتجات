@@ -17,7 +17,54 @@ function delay(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
-// دالة لجلب تفاصيل inventory_quantity من صفحة المنتج "آيسي رش"
+// تعريف المنتجات
+const productNames = {
+  'https://www.dzrt.com/en-sa/products/icy-rush': { ar: 'آيسي رش', en: 'icy-rush' },
+  'https://www.dzrt.com/en-sa/products/seaside-frost': { ar: 'سي سايد', en: 'seaside-frost' },
+ 'https://www.dzrt.com/en-sa/products/garden-mint': { ar: 'جاردن منت', en: 'garden-mint' },
+  'https://www.dzrt.com/en-sa/products/mint-fusion': { ar: 'منت فيوجن', en: 'mint-fusion' },
+ // 'https://www.dzrt.com/en-sa/products/edgy-mint': { ar: 'ايدجي منت', en: 'edgy-mint' },
+
+  'https://www.dzrt.com/en-sa/products/hamidh': { ar: 'حامض', en: 'Hamidh' },
+  'https://www.dzrt.com/en-sa/products/unqood': { ar: ' عنقود', en: 'Unqood' },
+  'https://www.dzrt.com/en-sa/products/manga': { ar: ' منقا', en: 'Manga' },
+  'https://www.dzrt.com/en-sa/products/bonna': { ar: 'بنه ', en: 'Bonna' },
+
+
+};
+
+const channels = {
+  'https://www.dzrt.com/en-sa/products/icy-rush': { chatId: process.env.CHAT_ID_ICY_RUSH },
+  'https://www.dzrt.com/en-sa/products/seaside-frost': { chatId: process.env.CHAT_ID_SEASIDE },
+  'https://www.dzrt.com/en-sa/products/garden-mint': { chatId: process.env.CHAT_ID_GARDEN },
+  'https://www.dzrt.com/en-sa/products/mint-fusion': { chatId: process.env.CHAT_ID_MINT },
+ // 'https://www.dzrt.com/en-sa/products/edgy-mint': {chatId: process.env.CHAT_ID_EDGY },
+  
+  'https://www.dzrt.com/en-sa/products/hamidh': {chatId: process.env.CHAT_ID_HAILA },
+  'https://www.dzrt.com/en-sa/products/unqood': {chatId: process.env.CHAT_ID_PURPLE },
+  'https://www.dzrt.com/en-sa/products/manga': {chatId: process.env.CHAT_ID_TAMRA },
+  'https://www.dzrt.com/en-sa/products/bonna': {chatId: process.env.CHAT_ID_SAMRA },
+
+};
+
+const mainChannelId = process.env.CHAT_ID_MAIN;
+const token = process.env.TOKEN3;
+const bot = new TelegramBot(token, { polling: true });
+
+// تخزين حالة المنتجات
+const productStatus = {};
+
+Object.keys(productNames).forEach(productUrl => {
+  productStatus[productUrl] = {
+    isAvailable: false,
+    isNotifying: false,
+    isOutOfStockNotified: false,
+    availableStartTime: null,
+    notificationLock: false
+  };
+});
+
+// دالة لجلب تفاصيل `inventory_quantity` من صفحة المنتج
 const getInventoryDetails = async (url) => {
   try {
     const pageContent = await cloudscraper.get(url);
@@ -45,72 +92,22 @@ const getInventoryDetails = async (url) => {
   }
 };
 
-// تعريف المنتجات
-const productNames = {
-  'https://www.dzrt.com/en-sa/products/icy-rush': { ar: 'آيسي رش', en: 'icy-rush' },
-  'https://www.dzrt.com/en-sa/products/seaside-frost': { ar: 'سي سايد', en: 'seaside-frost' },
-  'https://www.dzrt.com/en-sa/products/garden-mint': { ar: 'جاردن منت', en: 'garden-mint' },
-  'https://www.dzrt.com/en-sa/products/mint-fusion': { ar: 'منت فيوجن', en: 'mint-fusion' },
-  'https://www.dzrt.com/en-sa/products/hamidh': { ar: 'حامض', en: 'Hamidh' },
-  'https://www.dzrt.com/en-sa/products/unqood': { ar: ' عنقود', en: 'Unqood' },
-  'https://www.dzrt.com/en-sa/products/manga': { ar: ' منقا', en: 'Manga' },
-  'https://www.dzrt.com/en-sa/products/bonna': { ar: 'بنه ', en: 'Bonna' },
-};
-
-const channels = {
-  'https://www.dzrt.com/en-sa/products/icy-rush': { chatId: process.env.CHAT_ID_ICY_RUSH },
-  'https://www.dzrt.com/en-sa/products/seaside-frost': { chatId: process.env.CHAT_ID_SEASIDE },
-  'https://www.dzrt.com/en-sa/products/garden-mint': { chatId: process.env.CHAT_ID_GARDEN },
-  'https://www.dzrt.com/en-sa/products/mint-fusion': { chatId: process.env.CHAT_ID_MINT },
-  'https://www.dzrt.com/en-sa/products/hamidh': { chatId: process.env.CHAT_ID_HAILA },
-  'https://www.dzrt.com/en-sa/products/unqood': { chatId: process.env.CHAT_ID_PURPLE },
-  'https://www.dzrt.com/en-sa/products/manga': { chatId: process.env.CHAT_ID_TAMRA },
-  'https://www.dzrt.com/en-sa/products/bonna': { chatId: process.env.CHAT_ID_SAMRA },
-};
-
-const mainChannelId = process.env.CHAT_ID_MAIN;
-const token = process.env.TOKEN3;
-const bot = new TelegramBot(token, { polling: true });
-
-// تخزين حالة المنتجات
-const productStatus = {};
-
-Object.keys(productNames).forEach(productUrl => {
-  productStatus[productUrl] = {
-    isAvailable: false,
-    isNotifying: false,
-    isOutOfStockNotified: false,
-    availableStartTime: null,
-    notificationLock: false
-  };
-});
-
 // دالة لفحص توفر المنتجات
 const checkProductPages = async () => {
   const currentTime = Date.now();
 
   for (const [url, productInfo] of Object.entries(productNames)) {
     try {
-      let isAvailable = false;
-
-      // في حالة آيسي رش نستخدم inventory_quantity
-      if (productInfo.en === 'icy-rush') {
-        const inventoryQuantity = await getInventoryDetails(url);
-        isAvailable = inventoryQuantity !== null && inventoryQuantity > 0;
-      } else {
-        // لباقي المنتجات، نتحقق من عدم وجود عبارة "OUT OF STOCK"
-        const pageContent = await cloudscraper.get(url);
-        const $ = cheerio.load(pageContent);
-        const isOutOfStock = $('span:contains("OUT OF STOCK")').length > 0;
-        isAvailable = !isOutOfStock;
-      }
+      // التحقق من توفر المنتج من خلال المخزون
+      const inventoryQuantity = await getInventoryDetails(url);
+      const isAvailable = inventoryQuantity !== null && inventoryQuantity > 0;
 
       if (isAvailable) {
         const imageUrlAvailable = path.join(__dirname, '..', 'images', `${productInfo.en}.png`);
+
         const messageAvailable = `
 *${productInfo.ar}* - متوفر الآن ✅
         `;
-
         const replyMarkup = {
           inline_keyboard: [
             [
@@ -161,6 +158,7 @@ const checkProductPages = async () => {
           const minutesAvailable = Math.floor((timeAvailable % (1000 * 60 * 60)) / (1000 * 60));
           const secondsAvailable = Math.floor((timeAvailable % (1000 * 60)) / 1000);
 
+          // إنشاء رسالة بناءً على المدة المتوفرة
           let messageOutOfStock = `نفذ المنتج *${productInfo.ar}* ❌\nبقي متوفرًا لمدة: `;
 
           if (hoursAvailable > 0) {
@@ -181,6 +179,7 @@ const checkProductPages = async () => {
 
             const imageUrlOutOfStock = path.join(__dirname, '..', 'images', `${productInfo.en}-outofstock.png`);
 
+            // إرسال الصورة مع رسالة النفاد
             await bot.sendPhoto(channels[url].chatId, imageUrlOutOfStock, {
               caption: messageOutOfStock,
               parse_mode: 'Markdown'
@@ -198,7 +197,7 @@ const checkProductPages = async () => {
       }
 
       // إضافة تأخير قبل الانتقال للمنتج التالي
-      await delay(500);
+      await delay(500); // تأخير بسيط بين المنتجات
 
     } catch (error) {
       // يمكنك تفعيل السطر أدناه لعرض الأخطاء
