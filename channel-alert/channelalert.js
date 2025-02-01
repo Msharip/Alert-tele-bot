@@ -21,25 +21,25 @@ const env = {
 };
 // تعريف المنتجات
 const productNames = {
-//  'https://www.dzrt.com/en-sa/products/icy-rush': { ar: 'آيسي رش', en: 'icy-rush' },
-//  'https://www.dzrt.com/en-sa/products/seaside-frost': { ar: 'سي سايد', en: 'seaside-frost' },
+  'https://www.dzrt.com/en-sa/products/icy-rush': { ar: 'آيسي رش', en: 'icy-rush' },
+  'https://www.dzrt.com/en-sa/products/seaside-frost': { ar: 'سي سايد', en: 'seaside-frost' },
   'https://www.dzrt.com/en-sa/products/garden-mint': { ar: 'جاردن منت', en: 'garden-mint' },
   'https://www.dzrt.com/en-sa/products/mint-fusion': { ar: 'منت فيوجن', en: 'mint-fusion' },
   'https://www.dzrt.com/en-sa/products/hamidh': { ar: 'حامض', en: 'Hamidh' },
   'https://www.dzrt.com/en-sa/products/unqood': { ar: 'عنقود', en: 'Unqood' },
-  //'https://www.dzrt.com/en-sa/products/manga': { ar: 'منقا', en: 'Manga' },
-  //'https://www.dzrt.com/en-sa/products/bonna': { ar: 'بنه', en: 'Bonna' },
+  'https://www.dzrt.com/en-sa/products/manga': { ar: 'منقا', en: 'Manga' },
+  'https://www.dzrt.com/en-sa/products/bonna': { ar: 'بنه', en: 'Bonna' },
 };
 
 const channels = {
- // 'https://www.dzrt.com/en-sa/products/icy-rush': { chatId: env.CHAT_ID_ICY_RUSH },
-  //'https://www.dzrt.com/en-sa/products/seaside-frost': { chatId: env.CHAT_ID_SEASIDE },
+  'https://www.dzrt.com/en-sa/products/icy-rush': { chatId: env.CHAT_ID_ICY_RUSH },
+  'https://www.dzrt.com/en-sa/products/seaside-frost': { chatId: env.CHAT_ID_SEASIDE },
   'https://www.dzrt.com/en-sa/products/garden-mint': { chatId: env.CHAT_ID_GARDEN },
   'https://www.dzrt.com/en-sa/products/mint-fusion': { chatId: env.CHAT_ID_MINT },
   'https://www.dzrt.com/en-sa/products/hamidh': { chatId: env.CHAT_ID_HAILA },
   'https://www.dzrt.com/en-sa/products/unqood': { chatId: env.CHAT_ID_PURPLE },
- // 'https://www.dzrt.com/en-sa/products/manga': { chatId: env.CHAT_ID_TAMRA },
- // 'https://www.dzrt.com/en-sa/products/bonna': { chatId: env.CHAT_ID_SAMRA },
+  'https://www.dzrt.com/en-sa/products/manga': { chatId: env.CHAT_ID_TAMRA },
+  'https://www.dzrt.com/en-sa/products/bonna': { chatId: env.CHAT_ID_SAMRA },
 };
 
 const mainChannelId = env.CHAT_ID_MAIN;
