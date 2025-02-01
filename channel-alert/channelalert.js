@@ -82,7 +82,7 @@ const getInventoryDetails = async (url) => {
 
     return inventoryQuantity;
   } catch (error) {
-    console.error(`حدث خطأ أثناء جلب تفاصيل المخزون لـ ${url}:`, error.message);
+  //  console.error(`حدث خطأ أثناء جلب تفاصيل المخزون لـ ${url}:`, error.message);
     return null;
   }
 };
