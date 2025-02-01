@@ -1,10 +1,11 @@
 const axios = require('axios');
-const cheerio = require('cheerio');
+const cheerio = require('cheerio-without-node-native');
 const TelegramBot = require('node-telegram-bot-api');
 const cron = require('node-cron');
 const path = require('path');
 const mysql = require('mysql2/promise');
-const cloudscraper = require('cloudscraper');
+const moment = require('moment-timezone');
+const cloudscraper = require('cloudscraper'); // تأكد من تثبيت المكتبة عبر npm
 require('dotenv').config();
 
 // دالة تأخير لتنفيذ الفاصل الزمني بين كل منتج
@@ -35,6 +36,7 @@ const channels = {
   'https://www.dzrt.com/en-sa/products/bonna': { chatId: process.env.CHAT_ID_SAMRA },
 };
 
+
 const mainChannelId = process.env.CHAT_ID_MAIN;
 const token = process.env.TOKEN3;
 const bot = new TelegramBot(token, { polling: true });
@@ -52,6 +54,30 @@ Object.keys(productNames).forEach(productUrl => {
   };
 });
 
+// دالة لجلب تفاصيل `inventory_quantity` من صفحة المنتج
+const getInventoryDetails = async (url) => {
+  try {
+    const pageContent = await cloudscraper.get(url);
+    const $ = cheerio.load(pageContent);
+    let inventoryQuantity = null;
+
+    $('script').each((i, script) => {
+      const scriptContent = $(script).html();
+
+      if (scriptContent.includes('inventory_quantity')) {
+        const match = scriptContent.match(/"inventory_quantity":(\d+)/);
+        if (match && match[1]) {
+          inventoryQuantity = parseInt(match[1]);
+        }
+      }
+    });
+
+    return inventoryQuantity;
+  } catch (error) {
+    return null;
+  }
+};
+
 // دالة لفحص توفر المنتجات
 const checkProductPages = async () => {
   const currentTime = Date.now();
@@ -61,12 +87,21 @@ const checkProductPages = async () => {
       const pageContent = await cloudscraper.get(url);
       const $ = cheerio.load(pageContent);
 
-      // التحقق من عبارة OUT OF STOCK
-      const isOutOfStock = $('span:contains("OUT OF STOCK")').length > 0;
-      const isAvailable = !isOutOfStock;
+      let isAvailable = false;
+
+      if (productInfo.checkInventory) {
+        // التحقق من توفر المنتج من خلال المخزون
+        const inventoryQuantity = await getInventoryDetails(url);
+        isAvailable = inventoryQuantity !== null && inventoryQuantity > 0;
+      } else {
+        // التحقق من توفر المنتج من خلال عدم وجود عبارة "OUT OF STOCK"
+        const isOutOfStock = $('span:contains("OUT OF STOCK")').length > 0;
+        isAvailable = !isOutOfStock;
+      }
 
       if (isAvailable) {
         const imageUrlAvailable = path.join(__dirname, '..', 'images', `${productInfo.en}.png`);
+
 
         const messageAvailable = `
 *${productInfo.ar}* - متوفر الآن ✅
@@ -87,7 +122,7 @@ const checkProductPages = async () => {
           ]
         };
 
-        // إرسال الإشعار للمستخدمين إذا كان المنتج متوفر لأول مرة بعد النفاد
+        // إرسال الإشعار للمستخدمين
         if (!productStatus[url].isAvailable && !productStatus[url].notificationLock) {
           console.log(`${productInfo.ar} ✅ - المنتج متوفر الآن`);
 
@@ -104,11 +139,11 @@ const checkProductPages = async () => {
               reply_markup: JSON.stringify(replyMarkup)
             });
 
-            await bot.sendPhoto(mainChannelId, imageUrlAvailable, {
+          /*  await bot.sendPhoto(mainChannelId, imageUrlAvailable, {
               caption: messageAvailable,
               parse_mode: 'Markdown',
               reply_markup: JSON.stringify(replyMarkup)
-            });
+            });*/
 
             productStatus[url].isNotifying = false;
           }
@@ -121,7 +156,8 @@ const checkProductPages = async () => {
           const minutesAvailable = Math.floor((timeAvailable % (1000 * 60 * 60)) / (1000 * 60));
           const secondsAvailable = Math.floor((timeAvailable % (1000 * 60)) / 1000);
 
-          let messageOutOfStock = `نفذ المنتج *${productInfo.ar}* ❌\nبقي متوفرًا لمدة: `;
+          // إنشاء رسالة بناءً على المدة المتوفرة
+          let messageOutOfStock = `نفذ المنتج *${productInfo.ar}* ❌\ متوفرًا لمدة: `;
 
           if (hoursAvailable > 0) {
             messageOutOfStock += `${hoursAvailable} ساعات و ${minutesAvailable} دقائق و ${secondsAvailable} ثواني.`;
@@ -141,6 +177,7 @@ const checkProductPages = async () => {
 
             const imageUrlOutOfStock = path.join(__dirname, '..', 'images', `${productInfo.en}-outofstock.png`);
 
+            // إرسال الصورة مع رسالة النفاد
             await bot.sendPhoto(channels[url].chatId, imageUrlOutOfStock, {
               caption: messageOutOfStock,
               parse_mode: 'Markdown'
@@ -153,12 +190,12 @@ const checkProductPages = async () => {
           productStatus[url].notificationLock = true;
           setTimeout(() => {
             productStatus[url].notificationLock = false;
-          }, 5000); // مدة القفل 5 ثوانٍ
+          }, 10000); // مدة القفل 10 ثوانٍ
         }
       }
 
       // إضافة تأخير قبل الانتقال للمنتج التالي
-      await delay(500);
+      await delay(500); // تأخير بسيط بين المنتجات
 
     } catch (error) {
       // يمكنك تفعيل السطر أدناه لعرض الأخطاء
@@ -172,7 +209,7 @@ const monitorAvailability = async () => {
   try {
     await checkProductPages();
   } catch (error) {
-    console.error("حدث خطأ أثناء مراقبة توفر المنتجات:", error.response ? error.response.data : error.message);
+ //   console.error("حدث خطأ أثناء مراقبة توفر المنتجات:", error.response ? error.response.data : error.message);
   } finally {
     // نستخدم setTimeout لإعادة استدعاء الدالة بعد 1 ثانية
     setTimeout(monitorAvailability, 1000);
@@ -180,7 +217,6 @@ const monitorAvailability = async () => {
 };
 
 monitorAvailability();
-
 
 
 
