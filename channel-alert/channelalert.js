@@ -52,43 +52,18 @@ Object.keys(productNames).forEach(productUrl => {
   };
 });
 
-// دالة لجلب تفاصيل `inventory_quantity` من صفحة المنتج
-const getInventoryDetails = async (url) => {
-  try {
-    const pageContent = await cloudscraper.get(url);
-    const $ = cheerio.load(pageContent);
-    let inventoryQuantity = null;
-
-    $('script').each((i, script) => {
-      const scriptContent = $(script).html();
-
-      if (scriptContent.includes('inventory_quantity')) {
-        const parts = scriptContent.split('inventory_quantity');
-        if (parts.length > 1) {
-          const afterInventory = parts[1];
-          const match = afterInventory.match(/:\s*(-?\d+)/);
-          if (match) {
-            inventoryQuantity = parseInt(match[1]);
-          }
-        }
-      }
-    });
-
-    return inventoryQuantity;
-  } catch (error) {
-    return null;
-  }
-};
-
 // دالة لفحص توفر المنتجات
 const checkProductPages = async () => {
   const currentTime = Date.now();
 
   for (const [url, productInfo] of Object.entries(productNames)) {
     try {
-      // التحقق من توفر المنتج من خلال المخزون
-      const inventoryQuantity = await getInventoryDetails(url);
-      const isAvailable = inventoryQuantity !== null && inventoryQuantity > 0;
+      const pageContent = await cloudscraper.get(url);
+      const $ = cheerio.load(pageContent);
+
+      // التحقق من عبارة OUT OF STOCK
+      const isOutOfStock = $('span:contains("OUT OF STOCK")').length > 0;
+      const isAvailable = !isOutOfStock;
 
       if (isAvailable) {
         const imageUrlAvailable = path.join(__dirname, '..', 'images', `${productInfo.en}.png`);
@@ -112,7 +87,7 @@ const checkProductPages = async () => {
           ]
         };
 
-        // إرسال الإشعار للمستخدمين
+        // إرسال الإشعار للمستخدمين إذا كان المنتج متوفر لأول مرة بعد النفاد
         if (!productStatus[url].isAvailable && !productStatus[url].notificationLock) {
           console.log(`${productInfo.ar} ✅ - المنتج متوفر الآن`);
 
@@ -146,7 +121,6 @@ const checkProductPages = async () => {
           const minutesAvailable = Math.floor((timeAvailable % (1000 * 60 * 60)) / (1000 * 60));
           const secondsAvailable = Math.floor((timeAvailable % (1000 * 60)) / 1000);
 
-          // إنشاء رسالة بناءً على المدة المتوفرة
           let messageOutOfStock = `نفذ المنتج *${productInfo.ar}* ❌\nبقي متوفرًا لمدة: `;
 
           if (hoursAvailable > 0) {
@@ -167,7 +141,6 @@ const checkProductPages = async () => {
 
             const imageUrlOutOfStock = path.join(__dirname, '..', 'images', `${productInfo.en}-outofstock.png`);
 
-            // إرسال الصورة مع رسالة النفاد
             await bot.sendPhoto(channels[url].chatId, imageUrlOutOfStock, {
               caption: messageOutOfStock,
               parse_mode: 'Markdown'
@@ -180,12 +153,12 @@ const checkProductPages = async () => {
           productStatus[url].notificationLock = true;
           setTimeout(() => {
             productStatus[url].notificationLock = false;
-          }, 10000); // مدة القفل 10 ثوانٍ
+          }, 5000); // مدة القفل 5 ثوانٍ
         }
       }
 
       // إضافة تأخير قبل الانتقال للمنتج التالي
-   //   await delay(500); // تأخير بسيط بين المنتجات
+      await delay(500);
 
     } catch (error) {
       // يمكنك تفعيل السطر أدناه لعرض الأخطاء
@@ -199,7 +172,7 @@ const monitorAvailability = async () => {
   try {
     await checkProductPages();
   } catch (error) {
-  //  console.error("حدث خطأ أثناء مراقبة توفر المنتجات:", error.response ? error.response.data : error.message);
+    console.error("حدث خطأ أثناء مراقبة توفر المنتجات:", error.response ? error.response.data : error.message);
   } finally {
     // نستخدم setTimeout لإعادة استدعاء الدالة بعد 1 ثانية
     setTimeout(monitorAvailability, 1000);
@@ -207,6 +180,9 @@ const monitorAvailability = async () => {
 };
 
 monitorAvailability();
+
+
+
 
 
 // إعدادات قاعدة البيانات
