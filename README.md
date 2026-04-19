@@ -1,161 +1,236 @@
-#  Channel Alert Bot — بوت تنبيهات 
+# Channel Alert Bot — بوت تنبيهات توفر المنتجات
 
-بوت تيليغرام يراقب حاله توفر منتج عالي الطلب بشكل مستمر ويُرسل إشعارات فورية لقنوات تيليغرام المخصصة عند توفر أي منتج أو نفاده، مع إدارة طلبات الانضمام ومراقبة انتهاء الاشتراكات.
+بوت تيليغرام يراقب منتجات عالية الطلب تنفد خلال دقائق، ويُرسل إشعارات فورية بالصورة لقنوات مخصصة. مدمج معه نظام يُدير عضوية المشتركين تلقائيًا.
 
----
-
-##المميزات
-
--مراقبة مستمرة للمنتج
-- إشعار فوري عند توفر أي منتج مع صورة المنتج
-- إشعار عند نفاد المنتج مع مدة توفره بالدقائق والثواني
-- إرسال الإشعارات لقناة كل منتج + القناة الرئيسية
-- قبول طلبات الانضمام للقنوات تلقائيًا للمشتركين
-- تنبيه تلقائي للمشتركين قبل انتهاء اشتراكهم بيومين
--إزالة تلقائية للمستخدمين منتهي اشتراكهم من جميع القنوات
-- حماية من Cloudflare عبر cloudscraper
----
-
-##التقنيات المستخدمة
-
-| التقنية | الاستخدام |
-|---|---|
-| Node.js | بيئة التشغيل |
-| node-telegram-bot-api | التعامل مع Telegram API |
-| axios | طلبات HTTP |
-| cheerio | تحليل HTML (Web Scraping) |
-| cloudscraper | تجاوز حماية Cloudflare |
-| node-cron | جدولة المهام اليومية |
-| MySQL2 | قاعدة البيانات |
-| dotenv | إدارة المتغيرات البيئية |
+> مشروع خاص — معروض كنموذج عمل فقط
 
 ---
 
-## المتطلبات
+## فكرة المشروع
 
-- Node.js v16+
-- MySQL Database
-- بوتان على تيليغرام (بوت المراقبة + بوت الإشعارات)
-- صور المنتجات في مجلد `/images`
-- خادم يعمل بشكل مستمر (Heroku, Railway, VPS...)
+منتجات دزرت تنفد في دقائق معدودة — المستخدم الذي يعرف أولًا يشتري أولًا. البوت يفحص صفحات المنتجات كل ثانية، ويُرسل إشعارًا فوريًا مع أزرار شراء مباشرة لحظة التوفر. وعند النفاد يُعلن كم بقي المنتج متاحًا بالثواني.
 
 ---
 
-## طريقة التثبيت
+## ⚙️ التقنيات المستخدمة
 
-```bash
-# استنساخ المشروع
-git clone https://github.com/Msharip/test-.git
-cd test-/channel-alert
+**Node.js · Telegram Bot API · cheerio · cloudscraper · MySQL2 · node-cron · axios**
 
-# تثبيت الحزم
-npm install
+---
+
+## شرح الكود — ميزة بميزة
+
+### 1. Web Scraping مع تجاوز Cloudflare
+```js
+const pageContent = await cloudscraper.get(url);
+const $ = cheerio.load(pageContent);
+const isOutOfStock = $('span:contains("OUT OF STOCK")').length > 0;
+```
+الموقع محمي بـ Cloudflare — `cloudscraper` يتجاوز هذه الحماية تلقائيًا. بعدها `cheerio` يُحلل الـ HTML ويبحث عن نص "OUT OF STOCK". إذا لم يجده، المنتج متوفر.
+
+---
+
+### 2. مراقبة مستمرة بدون توقف
+```js
+const monitorAvailability = async () => {
+  try {
+    await checkProductPages();
+  } finally {
+    setTimeout(monitorAvailability, 1000);
+  }
+};
+monitorAvailability();
+```
+يستخدم `setTimeout` داخل `finally` — حتى لو حدث خطأ في أي دورة، المراقبة لا تتوقف وتُعيد المحاولة بعد ثانية.
+
+---
+
+### 3. فاصل زمني بين كل منتج
+```js
+await delay(500); // 500ms بين كل منتج
+```
+8 منتجات يُفحص كل واحد منها مع فاصل نصف ثانية. يمنع إرهاق الموقع بطلبات متزامنة ويتجنب الحظر.
+
+---
+
+### 4. إدارة حالة كل منتج في الذاكرة
+```js
+productStatus[url] = {
+  isAvailable: false,       // هل متوفر الآن؟
+  isNotifying: false,       // هل في منتصف إرسال إشعار؟
+  isOutOfStockNotified: false, // هل أُرسل إشعار النفاد؟
+  availableStartTime: null, // متى بدأ التوفر؟
+  notificationLock: false   // قفل منع التكرار
+};
+```
+كل منتج له 5 متغيرات تتحكم في منطق الإشعارات. يمنع الإشعارات المكررة ويتتبع دورة التوفر بدقة.
+
+---
+
+### 5. إشعار التوفر — صورة + أزرار شراء فوري
+```js
+await bot.sendPhoto(channels[url].chatId, imageUrlAvailable, {
+  caption: `*${productInfo.ar}* - متوفر الآن ✅`,
+  reply_markup: JSON.stringify({
+    inline_keyboard: [
+      [{ text: 'شراء سريع ⚡', url: 'dzrt.com/checkout' },
+       { text: 'المنتج 🟢', url: productUrl }],
+      [{ text: 'المنتجات 🛒', url: '...' },
+       { text: 'إعادة الطلب 🔁', url: '...' }],
+      [{ text: 'تسجيل دخول 🔒', url: '...' }]
+    ]
+  })
+});
+```
+الإشعار يُرسل لقناة المنتج المحددة **والقناة الرئيسية** في نفس الوقت. الأزرار مرتبة بالأهم أولًا — شراء سريع في الأعلى.
+
+---
+
+### 6. قنوات مخصصة لكل منتج عالي الطلب
+```js
+const channels = {
+  'icy-rush':      { chatId: process.env.CHAT_ID_ICY_RUSH },
+  'seaside-frost': { chatId: process.env.CHAT_ID_SEASIDE },
+  'garden-mint':   { chatId: process.env.CHAT_ID_GARDEN },
+  'mint-fusion':   { chatId: process.env.CHAT_ID_MINT },
+  'hamidh':        { chatId: process.env.CHAT_ID_HAILA },
+  'unqood':        { chatId: process.env.CHAT_ID_PURPLE },
+  'manga':         { chatId: process.env.CHAT_ID_TAMRA },
+  'bonna':         { chatId: process.env.CHAT_ID_SAMRA },
+};
+```
+كل منتج له قناة مستقلة — المشترك يختار المنتجات التي يهتم بها فقط ولا يتلقى إشعارات عن غيرها.
+
+---
+
+### 7. إشعار النفاد مع توقيت دقيق بالثواني
+```js
+const timeAvailable = currentTime - productStatus[url].availableStartTime;
+const hoursAvailable   = Math.floor(timeAvailable / (1000 * 60 * 60));
+const minutesAvailable = Math.floor((timeAvailable % (1000 * 60 * 60)) / (1000 * 60));
+const secondsAvailable = Math.floor((timeAvailable % (1000 * 60)) / 1000);
+
+// النتيجة مثلاً:
+// "نفذ المنتج ❌ — بقي متوفرًا لمدة: 3 دقائق و 47 ثانية."
+```
+البوت يحفظ وقت التوفر، وعند النفاد يحسب الفرق ويعرضه بدقة. معلومة مفيدة للمستخدمين لمعرفة سرعة النفاد.
+
+---
+
+### 8. Notification Lock لمنع الإشعارات المكررة
+```js
+productStatus[url].notificationLock = true;
+setTimeout(() => {
+  productStatus[url].notificationLock = false;
+}, 5000);
+```
+بعد إشعار النفاد، يُغلق البوت إمكانية إرسال إشعار جديد لمدة 5 ثوانٍ. يمنع الإشعارات المتكررة إذا تذبذب المخزون.
+
+---
+
+### 9. قبول طلبات الانضمام تلقائيًا
+```js
+bot.on('chat_join_request', (request) => {
+  handleJoinRequests(request);
+});
+
+// داخل handleJoinRequests:
+const [results] = await connection.query(query, [userId]);
+if (results.length > 0) {
+  await approveJoinRequestWithDelay(channelId, userId);
+}
+```
+عند طلب انضمام لأي قناة، البوت يتحقق من قاعدة البيانات — إذا المستخدم مشترك يقبله تلقائيًا، وإذا لا فلا.
+
+---
+
+### 10. تأخير 5 ثوانٍ عند قبول الطلبات
+```js
+const approveJoinRequestWithDelay = (channelId, userId) => {
+  return new Promise((resolve, reject) => {
+    setTimeout(async () => {
+      await bot.approveChatJoinRequest(channelId, userId);
+      resolve();
+    }, 5000);
+  });
+};
+```
+تأخير مقصود لتجنب تجاوز حدود Telegram API عند وصول طلبات كثيرة في وقت واحد.
+
+---
+
+### 11. فحص الاشتراكات المنتهية — جدولة يومية
+```js
+cron.schedule('30 1 * * *', () => {
+  checkUserSubscriptions();
+});
+```
+كل يوم الساعة 1:30 صباحًا البوت يفحص جميع المشتركين:
+- **تبقى يومان أو أقل** → إرسال تنبيه بتاريخ الانتهاء
+- **انتهى الاشتراك** → إزالة من جميع القنوات + تعطيل الحساب
+
+---
+
+### 12. الإزالة من 11 قناة دفعةً واحدة
+```js
+const channelIds = [
+  CHAT_ID_MAIN, CHAT_ID_ICY_RUSH, CHAT_ID_SEASIDE,
+  CHAT_ID_SAMRA, CHAT_ID_HIGH, CHAT_ID_GARDEN,
+  CHAT_ID_MINT, CHAT_ID_HAILA, CHAT_ID_PURPPLE,
+  CHAT_ID_EDGY, CHAT_ID_TAMRA
+];
+await unbanUserFromAllChannels(userId, channelIds);
+```
+بدل الإزالة اليدوية، البوت يمر على كل القنوات ويُزيل المستخدم تلقائيًا مع تأخير ثانيتين بين كل قناة لتجنب حدود Telegram API.
+
+---
+
+### 13. معالجة الأخطاء في الإزالة
+```js
+} catch (error) {
+  if (error.response.body.description === 'Bad Request: PARTICIPANT_ID_INVALID') {
+    // المستخدم غير موجود في القناة — يتجاوز بصمت
+  } else {
+    console.error(`Failed to unban user ${userId}:`, error);
+  }
+}
+```
+إذا المستخدم لم يكن في القناة أصلًا، الكود يتجاوز الخطأ بصمت بدل أن يتوقف.
+
+---
+
+### 14. إرسال الإشعارات على دفعات — Batch Processing
+```js
+const BATCH_SIZE = 20;
+const DELAY_BETWEEN_BATCHES = 10000; // 10 ثوانٍ بين كل دفعة
+
+for (let i = 0; i < usersToNotify.length; i += BATCH_SIZE) {
+  const batch = usersToNotify.slice(i, i + BATCH_SIZE);
+  await Promise.all(batch.map(user => notifyUser(user)));
+  await delay(DELAY_BETWEEN_BATCHES);
+}
+```
+عند إرسال إشعارات لعدد كبير من المستخدمين، يُرسل 20 رسالة في نفس الوقت ثم ينتظر 10 ثوانٍ — يحترم حدود Telegram API ولا يُحظر.
+
+---
+
+## 📸 نموذج إشعار التوفر
+
+```
+[صورة المنتج]
+
+منتج عالي الطلب - متوفر الآن ✅
+
+[ شراء سريع ⚡ ]  [ المنتج 🟢       ]
+[ المنتجات 🛒   ]  [ إعادة الطلب 🔁 ]
+[     تسجيل دخول 🔒      ]
 ```
 
----
-
-##إعداد صور المنتجات
-
+## 📸 نموذج إشعار النفاد
 
 ```
-images/
-├── icy-rush.png              # صورة توفر المنتج 
-├── icy-rush-outofstock.png   # صورة نفاد المنتج 
-├── seaside-frost.png
-├── seaside-frost-outofstock.png
-├── garden-mint.png
-├── garden-mint-outofstock.png
-├── mint-fusion.png
-├── mint-fusion-outofstock.png
-├── Hamidh.png
-├── Hamidh-outofstock.png
-├── Unqood.png
-├── Unqood-outofstock.png
-├── Manga.png
-├── Manga-outofstock.png
-├── Bonna.png
-└── Bonna-outofstock.png
+[صورة نافد]
+
+نفذ المنتج ❌
+بقي متوفرًا لمدة: 3 دقائق و 47 ثانية.
 ```
-
----
-
-##إعداد المتغيرات البيئية
-
-```env
-# توكن البوت الرئيسي (للمراقبة وقبول الطلبات)
-TOKEN3=your_main_bot_token
-
-# توكن البوت الفرعي (لإرسال رسائل للمستخدمين)
-TOKEN5=your_sub_bot_token
-
-# قاعدة البيانات
-DB_HOST=your_database_host
-DB_USER=your_database_user
-DB_PASSWORD=your_database_password
-DB_DATABASE=your_database_name
-DB_PORT=3306
-
-# معرفات القنوات
-CHAT_ID_MAIN=your_main_channel_id
-CHAT_ID_ICY_RUSH=your_icy_rush_channel_id
-CHAT_ID_SEASIDE=your_seaside_channel_id
-CHAT_ID_GARDEN=your_garden_channel_id
-CHAT_ID_MINT=your_mint_channel_id
-CHAT_ID_HAILA=your_hamidh_channel_id
-CHAT_ID_PURPLE=your_unqood_channel_id
-CHAT_ID_TAMRA=your_manga_channel_id
-CHAT_ID_SAMRA=your_bonna_channel_id
-CHAT_ID_HIGH=your_highland_channel_id
-CHAT_ID_EDGY=your_edgy_channel_id
-CHAT_ID_PURPPLE=your_purple_channel_id
-```
-
----
-
-## قاعدة البيانات
-
-```sql
-CREATE TABLE users (
-  id BIGINT PRIMARY KEY,
-  activated BOOLEAN DEFAULT false,
-  subscriptionType VARCHAR(50),
-  startDate DATE,
-  expiryDate DATE
-);
-```
-
----
-
-##تشغيل البوت
-
-```bash
-node channelalert.js
-```
-
----
-
-## كيف يعمل البوت؟
-
-```
-فحص حاله المنتج ── فحص صفحة كل منتج على الموقع الخاص بالمنتج
-                    │
-         ┌──────────┴──────────┐
-      متوفر ✅               نافد ❌
-         │                     │
-  إشعار للقناة           إشعار بمدة التوفر
-  الخاصة + الرئيسية       للقناة الخاصة
-```
-
-**جدولة يومية (1:30 ص):**
-- فحص جميع المشتركين
-- تنبيه من تبقى له يومان أو أقل
-- إزالة منتهي الاشتراك من جميع القنوات تلقائيًا
-
----
-
-#
-
----
-
-##الرخصة
-هذا المشروع خاص وغير مرخص للاستخدام العام.
