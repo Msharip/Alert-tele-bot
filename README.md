@@ -73,7 +73,7 @@ await bot.sendPhoto(channels[url].chatId, imageUrlAvailable, {
   caption: `*${productInfo.ar}* - متوفر الآن ✅`,
   reply_markup: JSON.stringify({
     inline_keyboard: [
-      [{ text: 'شراء سريع ⚡', url: 'dzrt.com/checkout' },
+      [{ text: 'شراء سريع ⚡', url: '' },
        { text: 'المنتج 🟢', url: productUrl }],
       [{ text: 'المنتجات 🛒', url: '...' },
        { text: 'إعادة الطلب 🔁', url: '...' }],
